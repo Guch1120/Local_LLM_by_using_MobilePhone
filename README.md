@@ -3,6 +3,14 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/google-ai-edge/gallery)](https://github.com/google-ai-edge/gallery/releases)
 
+
+### 環境構築と実行
+すまん、bashファイル名をちゃんと書くのめんどくなってる。tab補完使って。
+'''bash
+bash docker/scripts/launch-dockerなんとかかんとかっていうbashファイル
+'''
+これでdockerビルドするし、terminatorも起動すると思う。
+
 **Explore, Experience, and Evaluate the Future of On-Device Generative AI with Google AI Edge.**
 
 AI Edge Gallery is the premier destination for running the world's most powerful open-source Large Language Models (LLMs) on your mobile device. Experience high-performance Generative AI directly on your hardware—fully offline, private, and lightning-fast.
