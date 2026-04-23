@@ -10,6 +10,7 @@
 bash docker/scripts/launch-dockerなんとかかんとかっていうbashファイル
 '''
 これでdockerビルドするし、terminatorも起動すると思う。
+起動してからアプリ起動とか色々はmemo.mdをみて
 
 **Explore, Experience, and Evaluate the Future of On-Device Generative AI with Google AI Edge.**
 
