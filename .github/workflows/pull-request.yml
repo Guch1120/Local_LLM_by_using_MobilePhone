@@ -17,6 +17,8 @@ jobs:
         run: git lfs install --skip-smudge
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project iPhoneLocalAI.xcodeproj -scheme iPhoneLocalAI
+      - name: Install SwiftLint
+        run: brew install swiftlint
       - name: Lint Swift sources
         run: swiftlint lint --quiet
       - name: Build iOS Simulator app
