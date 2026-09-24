@@ -199,10 +199,13 @@ final class HTTPServer {
             throw NSError(domain: "HTTPServer", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid TCP port."])
         }
         let parameters = NWParameters.tcp
+        let newListener: NWListener
         if !allowLAN {
             parameters.requiredLocalEndpoint = .hostPort(host: NWEndpoint.Host("127.0.0.1"), port: endpointPort)
+            newListener = try NWListener(using: parameters)
+        } else {
+            newListener = try NWListener(using: parameters, on: endpointPort)
         }
-        let newListener = try NWListener(using: parameters, on: endpointPort)
         listener = newListener
         newListener.newConnectionHandler = { [weak self] connection in
             guard let self else { connection.cancel(); return }
