@@ -26,7 +26,7 @@ enum ModelImportError: Error, LocalizedError {
 }
 
 actor ModelManager {
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
     private let directoryURL: URL
     private let registryURL: URL
     private var installedModels: [InstalledModel] = []
