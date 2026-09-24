@@ -26,10 +26,12 @@ jobs:
           xcodebuild -project iPhoneLocalAI.xcodeproj
           -scheme iPhoneLocalAI
           -destination 'generic/platform=iOS Simulator'
+          -arch arm64
           CODE_SIGNING_ALLOWED=NO build
       - name: Run unit tests
         run: >-
           xcodebuild -project iPhoneLocalAI.xcodeproj
           -scheme iPhoneLocalAI
           -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5'
+          -arch arm64
           CODE_SIGNING_ALLOWED=NO test

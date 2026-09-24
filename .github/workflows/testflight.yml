@@ -40,6 +40,7 @@ jobs:
           xcodebuild -project iPhoneLocalAI.xcodeproj
           -scheme iPhoneLocalAI
           -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5'
+          -arch arm64
           CODE_SIGNING_ALLOWED=NO test
       - name: Install signing assets
         run: |
