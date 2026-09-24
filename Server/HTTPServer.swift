@@ -357,13 +357,23 @@ final class HTTPServer {
             await sendError(type: mapped.type, message: mapped.message, requestID: request.id, status: mapped.status, on: session)
             return
         }
+        let promptTokenCount = estimatedTokenCount(request.messages)
+        let completionTokenCount = max(1, content.split(whereSeparator: \.isWhitespace).count)
         let response: [String: Any] = [
             "id": "chatcmpl-\(request.id)",
             "object": "chat.completion",
             "created": Int(Date().timeIntervalSince1970),
             "model": request.model,
-            "choices": [["index": 0, "message": ["role": "assistant", "content": content], "finish_reason": finishReason]],
-            "usage": ["prompt_tokens": estimatedTokenCount(request.messages), "completion_tokens": max(1, content.split(whereSeparator: \.isWhitespace).count), "total_tokens": estimatedTokenCount(request.messages) + max(1, content.split(whereSeparator: \.isWhitespace).count)]
+            "choices": [[
+                "index": 0,
+                "message": ["role": "assistant", "content": content],
+                "finish_reason": finishReason
+            ]],
+            "usage": [
+                "prompt_tokens": promptTokenCount,
+                "completion_tokens": completionTokenCount,
+                "total_tokens": promptTokenCount + completionTokenCount
+            ]
         ]
         await session.sendJSON(response, status: 200)
     }

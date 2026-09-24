@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct iPhoneLocalAIApp: App {
+struct IPhoneLocalAIApp: App {
     @StateObject private var appState = AppState()
     @Environment(\.scenePhase) private var scenePhase
 
