@@ -1,0 +1,31 @@
+name: iOS pull request
+
+on:
+  pull_request:
+  push:
+    branches: [main, iphone]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Resolve Swift packages
+        run: xcodebuild -resolvePackageDependencies -project iPhoneLocalAI.xcodeproj -scheme iPhoneLocalAI
+      - name: Lint Swift sources
+        run: swiftlint lint --quiet
+      - name: Build iOS Simulator app
+        run: >-
+          xcodebuild -project iPhoneLocalAI.xcodeproj
+          -scheme iPhoneLocalAI
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build
+      - name: Run unit tests
+        run: >-
+          xcodebuild -project iPhoneLocalAI.xcodeproj
+          -scheme iPhoneLocalAI
+          -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5'
+          CODE_SIGNING_ALLOWED=NO test

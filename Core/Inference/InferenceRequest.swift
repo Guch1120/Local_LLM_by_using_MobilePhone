@@ -1,0 +1,97 @@
+import Foundation
+
+struct InferenceDefaults: Sendable, Equatable {
+    let maxTokens: Int
+    let temperature: Double
+    let contextTokens: Int
+
+    static let standard = InferenceDefaults(maxTokens: 512, temperature: 0.7, contextTokens: 4096)
+}
+
+enum MessageRole: String, Codable, Sendable {
+    case system
+    case user
+    case assistant
+    case tool
+}
+
+struct ToolInvocation: Codable, Sendable {
+    let name: String
+    let argumentsJSON: String
+}
+
+enum MessagePart: Sendable {
+    case text(String)
+    case image(ImageInput)
+    case audio(Data, mimeType: String)
+    case tool(ToolInvocation)
+}
+
+struct ImageInput: Sendable {
+    let data: Data
+    let mimeType: String
+}
+
+struct InferenceMessage: Sendable {
+    let role: MessageRole
+    let parts: [MessagePart]
+}
+
+struct InferenceRequest: Sendable {
+    let id: String
+    let model: String
+    let messages: [InferenceMessage]
+    let maxTokens: Int
+    let temperature: Double
+}
+
+struct InferenceChunk: Sendable {
+    let text: String
+    let finishReason: String?
+
+    init(text: String, finishReason: String? = nil) {
+        self.text = text
+        self.finishReason = finishReason
+    }
+}
+
+struct ModelConfiguration: Sendable {
+    let id: String
+    let name: String
+    let fileURL: URL
+    let sha256: String
+    let contextTokens: Int
+    let multiTokenPredictionEnabled: Bool
+}
+
+enum InferenceError: Error, LocalizedError, Sendable {
+    case modelNotLoaded
+    case modelNotFound(String)
+    case unsupportedModality(String)
+    case backendUnavailable(String)
+    case requestInProgress
+    case outOfMemory
+    case thermalLimit(String)
+    case generationCancelled
+
+    var errorDescription: String? {
+        switch self {
+        case .modelNotLoaded:
+            return "No inference model is loaded."
+        case let .modelNotFound(id):
+            return "Model '\(id)' is not installed."
+        case let .unsupportedModality(modality):
+            return "The active backend does not support \(modality) input."
+        case let .backendUnavailable(message):
+            return message
+        case .requestInProgress:
+            return "Another inference request is already running. Try again when it finishes."
+        case .outOfMemory:
+            return "The device does not have enough memory to complete this request."
+        case let .thermalLimit(state):
+            return "Inference is paused because the device thermal state is \(state)."
+        case .generationCancelled:
+            return "Generation was cancelled."
+        }
+    }
+}

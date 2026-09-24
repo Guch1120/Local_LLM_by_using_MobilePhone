@@ -1,0 +1,106 @@
+name: TestFlight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: macos-26
+    env:
+      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+      APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      IOS_DISTRIBUTION_CERTIFICATE_P12: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_P12 }}
+      IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Check signing and App Store Connect secrets
+        run: |
+          set -euo pipefail
+          : "${APPSTORE_ISSUER_ID:?Add the APPSTORE_ISSUER_ID repository secret}"
+          : "${APPSTORE_API_KEY_ID:?Add the APPSTORE_API_KEY_ID repository secret}"
+          : "${APPSTORE_API_PRIVATE_KEY:?Add the APPSTORE_API_PRIVATE_KEY repository secret}"
+          : "${APPLE_TEAM_ID:?Add the APPLE_TEAM_ID repository secret}"
+          : "${IOS_DISTRIBUTION_CERTIFICATE_P12:?Add the IOS_DISTRIBUTION_CERTIFICATE_P12 repository secret}"
+          : "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD:?Add the IOS_DISTRIBUTION_CERTIFICATE_PASSWORD repository secret}"
+          : "${IOS_PROVISIONING_PROFILE_BASE64:?Add the IOS_PROVISIONING_PROFILE_BASE64 repository secret}"
+          : "${KEYCHAIN_PASSWORD:?Add the KEYCHAIN_PASSWORD repository secret}"
+      - name: Resolve Swift packages
+        run: xcodebuild -resolvePackageDependencies -project iPhoneLocalAI.xcodeproj -scheme iPhoneLocalAI
+      - name: Run unit tests
+        run: >-
+          xcodebuild -project iPhoneLocalAI.xcodeproj
+          -scheme iPhoneLocalAI
+          -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5'
+          CODE_SIGNING_ALLOWED=NO test
+      - name: Install signing assets
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PATH="$RUNNER_TEMP/ios-build.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/ios-distribution.p12"
+          PROFILE_PATH="$RUNNER_TEMP/ios-profile.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/ios-profile.plist"
+          echo "$IOS_DISTRIBUTION_CERTIFICATE_P12" | base64 -D > "$CERT_PATH"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -D > "$PROFILE_PATH"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$PROFILE_PLIST")
+          echo "IOS_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+      - name: Archive
+        run: >-
+          xcodebuild -project iPhoneLocalAI.xcodeproj
+          -scheme iPhoneLocalAI
+          -configuration Release
+          -destination 'generic/platform=iOS'
+          -archivePath "$RUNNER_TEMP/iPhoneLocalAI.xcarchive"
+          DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
+          CODE_SIGN_STYLE=manual
+          CODE_SIGN_IDENTITY='Apple Distribution'
+          PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME"
+          CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
+          archive
+      - name: Export IPA
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string></string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key><dict>
+              <key>jp.localai.iphone-server</key><string></string>
+            </dict>
+          </dict></plist>
+          PLIST
+          /usr/libexec/PlistBuddy -c "Set :teamID $APPLE_TEAM_ID" "$RUNNER_TEMP/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:jp.localai.iphone-server $IOS_PROFILE_NAME" "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/iPhoneLocalAI.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+      - name: Upload to TestFlight
+        env:
+          API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$API_PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_API_KEY_ID}.p8"
+          xcrun iTMSTransporter -m upload \
+            -assetFile "$RUNNER_TEMP/export/iPhoneLocalAI.ipa" \
+            -apiKey "$APPSTORE_API_KEY_ID" \
+            -apiIssuer "$APPSTORE_ISSUER_ID"

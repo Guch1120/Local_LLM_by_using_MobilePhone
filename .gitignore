@@ -1,0 +1,25 @@
+# Xcode local state
+DerivedData/
+*.xcarchive/
+*.xcresult/
+*.ipa
+*.dSYM/
+.DS_Store
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+*.xccheckout
+
+# Signing material and model weights
+*.p12
+*.mobileprovision
+*.cer
+*.p8
+*.litertlm
+*.task
+*.gguf
+
+# Local secrets and build output
+.env
+.env.*
+build/

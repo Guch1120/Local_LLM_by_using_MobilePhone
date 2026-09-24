@@ -1,0 +1,160 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		200000000000000000000001 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000001 /* AppState.swift */; };
+		200000000000000000000002 /* iPhoneLocalAIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000002 /* iPhoneLocalAIApp.swift */; };
+		200000000000000000000003 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000003 /* MainTabView.swift */; };
+		200000000000000000000004 /* ServerStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000004 /* ServerStatusView.swift */; };
+		200000000000000000000005 /* ModelManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000005 /* ModelManagerView.swift */; };
+		200000000000000000000006 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000006 /* SettingsView.swift */; };
+		200000000000000000000007 /* DiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000007 /* DiagnosticsView.swift */; };
+		200000000000000000000008 /* LogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000008 /* LogsView.swift */; };
+		20000000000000000000000A /* InferenceBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000A /* InferenceBackend.swift */; };
+		20000000000000000000000B /* InferenceRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000B /* InferenceRequest.swift */; };
+		20000000000000000000000C /* InferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000C /* InferenceService.swift */; };
+		20000000000000000000000D /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000D /* ModelManager.swift */; };
+		20000000000000000000000E /* MetricsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000E /* MetricsService.swift */; };
+		20000000000000000000000F /* LogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000F /* LogService.swift */; };
+		200000000000000000000010 /* APIKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000010 /* APIKeyStore.swift */; };
+		200000000000000000000011 /* BearerTokenAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000011 /* BearerTokenAuthenticator.swift */; };
+		200000000000000000000012 /* LiteRTGemmaBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000012 /* LiteRTGemmaBackend.swift */; };
+		200000000000000000000013 /* MockInferenceBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000013 /* MockInferenceBackend.swift */; };
+		200000000000000000000014 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000014 /* HTTPServer.swift */; };
+		200000000000000000000015 /* OpenAIRequestAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000015 /* OpenAIRequestAdapter.swift */; };
+		200000000000000000000016 /* OpenAIRequestAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000016 /* OpenAIRequestAdapterTests.swift */; };
+		200000000000000000000017 /* SecurityAndModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000017 /* SecurityAndModelTests.swift */; };
+		200000000000000000000019 /* HTTPServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000018 /* HTTPServerTests.swift */; };
+		200000000000000000000018 /* LiteRTLM in Frameworks */ = {isa = PBXBuildFile; productRef = 800000000000000000000002 /* LiteRTLM */; };
+		20000000000000000000001A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000019 /* Assets.xcassets */; };
+		20000000000000000000001B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000001A /* PrivacyInfo.xcprivacy */; };
+		100000000000000000000001 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		100000000000000000000002 /* iPhoneLocalAIApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPhoneLocalAIApp.swift; sourceTree = "<group>"; };
+		100000000000000000000003 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		100000000000000000000004 /* ServerStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerStatusView.swift; sourceTree = "<group>"; };
+		100000000000000000000005 /* ModelManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerView.swift; sourceTree = "<group>"; };
+		100000000000000000000006 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		100000000000000000000007 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
+		100000000000000000000008 /* LogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsView.swift; sourceTree = "<group>"; };
+		100000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		10000000000000000000000A /* InferenceBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceBackend.swift; sourceTree = "<group>"; };
+		10000000000000000000000B /* InferenceRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceRequest.swift; sourceTree = "<group>"; };
+		10000000000000000000000C /* InferenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceService.swift; sourceTree = "<group>"; };
+		10000000000000000000000D /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
+		10000000000000000000000E /* MetricsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsService.swift; sourceTree = "<group>"; };
+		10000000000000000000000F /* LogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogService.swift; sourceTree = "<group>"; };
+		100000000000000000000010 /* APIKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyStore.swift; sourceTree = "<group>"; };
+		100000000000000000000011 /* BearerTokenAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BearerTokenAuthenticator.swift; sourceTree = "<group>"; };
+		100000000000000000000012 /* LiteRTGemmaBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiteRTGemmaBackend.swift; sourceTree = "<group>"; };
+		100000000000000000000013 /* MockInferenceBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockInferenceBackend.swift; sourceTree = "<group>"; };
+		100000000000000000000014 /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
+		100000000000000000000015 /* OpenAIRequestAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIRequestAdapter.swift; sourceTree = "<group>"; };
+		100000000000000000000016 /* OpenAIRequestAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIRequestAdapterTests.swift; sourceTree = "<group>"; };
+		100000000000000000000017 /* SecurityAndModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityAndModelTests.swift; sourceTree = "<group>"; };
+		100000000000000000000018 /* HTTPServerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServerTests.swift; sourceTree = "<group>"; };
+		100000000000000000000019 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		10000000000000000000001A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		900000000000000000000001 /* iPhoneLocalAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iPhoneLocalAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		900000000000000000000002 /* iPhoneLocalAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iPhoneLocalAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		300000000000000000000004 /* Views */ = {isa = PBXGroup; children = (100000000000000000000003, 100000000000000000000004, 100000000000000000000005, 100000000000000000000006, 100000000000000000000007, 100000000000000000000008); path = Views; sourceTree = "<group>"; };
+		300000000000000000000003 /* App */ = {isa = PBXGroup; children = (100000000000000000000001, 100000000000000000000002, 100000000000000000000009, 300000000000000000000004); name = App; path = App; sourceTree = "<group>"; };
+		300000000000000000000006 /* Inference */ = {isa = PBXGroup; children = (10000000000000000000000A, 10000000000000000000000B, 10000000000000000000000C); path = Inference; sourceTree = "<group>"; };
+		300000000000000000000007 /* Models */ = {isa = PBXGroup; children = (10000000000000000000000D); path = Models; sourceTree = "<group>"; };
+		300000000000000000000008 /* Metrics */ = {isa = PBXGroup; children = (10000000000000000000000E); path = Metrics; sourceTree = "<group>"; };
+		300000000000000000000009 /* Logging */ = {isa = PBXGroup; children = (10000000000000000000000F); path = Logging; sourceTree = "<group>"; };
+		30000000000000000000000A /* Security */ = {isa = PBXGroup; children = (100000000000000000000010, 100000000000000000000011); path = Security; sourceTree = "<group>"; };
+		300000000000000000000005 /* Core */ = {isa = PBXGroup; children = (300000000000000000000006, 300000000000000000000007, 300000000000000000000008, 300000000000000000000009, 30000000000000000000000A); name = Core; path = Core; sourceTree = "<group>"; };
+		30000000000000000000000C /* LiteRT */ = {isa = PBXGroup; children = (100000000000000000000012); path = LiteRT; sourceTree = "<group>"; };
+		30000000000000000000000D /* Mock */ = {isa = PBXGroup; children = (100000000000000000000013); path = Mock; sourceTree = "<group>"; };
+		30000000000000000000000B /* Backends */ = {isa = PBXGroup; children = (30000000000000000000000C, 30000000000000000000000D); name = Backends; path = Backends; sourceTree = "<group>"; };
+		30000000000000000000000F /* OpenAI */ = {isa = PBXGroup; children = (100000000000000000000015); path = OpenAI; sourceTree = "<group>"; };
+		30000000000000000000000E /* Server */ = {isa = PBXGroup; children = (100000000000000000000014, 30000000000000000000000F); name = Server; path = Server; sourceTree = "<group>"; };
+		300000000000000000000010 /* Tests */ = {isa = PBXGroup; children = (100000000000000000000016, 100000000000000000000017, 100000000000000000000018); name = Tests; path = Tests; sourceTree = "<group>"; };
+		300000000000000000000002 /* Products */ = {isa = PBXGroup; children = (900000000000000000000001, 900000000000000000000002); name = Products; sourceTree = "<group>"; };
+		300000000000000000000001 /* root */ = {isa = PBXGroup; children = (300000000000000000000003, 300000000000000000000005, 30000000000000000000000B, 30000000000000000000000E, 300000000000000000000010, 100000000000000000000019, 10000000000000000000001A, 300000000000000000000002); sourceTree = "<group>"; };
+		400000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				200000000000000000000001,
+				200000000000000000000002,
+				200000000000000000000003,
+				200000000000000000000004,
+				200000000000000000000005,
+				200000000000000000000006,
+				200000000000000000000007,
+				200000000000000000000008,
+				20000000000000000000000A,
+				20000000000000000000000B,
+				20000000000000000000000C,
+				20000000000000000000000D,
+				20000000000000000000000E,
+				20000000000000000000000F,
+				200000000000000000000010,
+				200000000000000000000011,
+				200000000000000000000012,
+				200000000000000000000013,
+				200000000000000000000014,
+				200000000000000000000015,
+			); runOnlyForDeploymentPostprocessing = 0; };
+		400000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (200000000000000000000018 /* LiteRTLM in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
+		400000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (20000000000000000000001A /* Assets.xcassets in Resources */, 20000000000000000000001B /* PrivacyInfo.xcprivacy in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+		400000000000000000000004 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				200000000000000000000016,
+				200000000000000000000017,
+				200000000000000000000019,
+			); runOnlyForDeploymentPostprocessing = 0; };
+		400000000000000000000005 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		400000000000000000000006 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A00000000000000000000001 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = 700000000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = 500000000000000000000001; remoteInfo = iPhoneLocalAI; };
+		A00000000000000000000002 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = 500000000000000000000001; targetProxy = A00000000000000000000001; };
+		500000000000000000000001 /* iPhoneLocalAI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B00000000000000000000002;
+			buildPhases = (400000000000000000000001 /* Sources */, 400000000000000000000002 /* Frameworks */, 400000000000000000000003 /* Resources */,);
+			buildRules = ();
+			dependencies = ();
+			name = iPhoneLocalAI;
+			packageProductDependencies = (800000000000000000000002 /* LiteRTLM */,);
+			productName = iPhoneLocalAI;
+			productReference = 900000000000000000000001 /* iPhoneLocalAI.app */;
+			productType = "com.apple.product-type.application";
+		};
+		500000000000000000000002 /* iPhoneLocalAITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B00000000000000000000003;
+			buildPhases = (400000000000000000000004 /* Sources */, 400000000000000000000005 /* Frameworks */, 400000000000000000000006 /* Resources */,);
+			buildRules = ();
+			dependencies = (A00000000000000000000002 /* PBXTargetDependency */,);
+			name = iPhoneLocalAITests;
+			packageProductDependencies = ();
+			productName = iPhoneLocalAITests;
+			productReference = 900000000000000000000002 /* iPhoneLocalAITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		700000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; TargetAttributes = {500000000000000000000001 = {CreatedOnToolsVersion = 26.0; LastSwiftMigration = 2600; }; 500000000000000000000002 = {CreatedOnToolsVersion = 26.0; LastSwiftMigration = 2600; TestTargetID = 500000000000000000000001; }; }; };
+			buildConfigurationList = B00000000000000000000001;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base,);
+			mainGroup = 300000000000000000000001;
+			packageReferences = (800000000000000000000001 /* XCRemoteSwiftPackageReference LiteRT-LM */,);
+			productRefGroup = 300000000000000000000002;
+			targets = (500000000000000000000001 /* iPhoneLocalAI */, 500000000000000000000002 /* iPhoneLocalAITests */,);
+		};
+		800000000000000000000001 /* XCRemoteSwiftPackageReference LiteRT-LM */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/google-ai-edge/LiteRT-LM"; requirement = {kind = exactVersion; version = 0.17.1; }; };
+		800000000000000000000002 /* LiteRTLM */ = {isa = XCSwiftPackageProductDependency; package = 800000000000000000000001 /* XCRemoteSwiftPackageReference LiteRT-LM */; productName = LiteRTLM; };
+		600000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_VERSION = 5.0; }; name = Debug; };
+		600000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 5.0; }; name = Release; };
+		600000000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = App/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = jp.localai.iphone-server; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = minimal; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Debug; };
+		600000000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = App/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = jp.localai.iphone-server; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = minimal; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Release; };
+		600000000000000000000005 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = jp.localai.iphone-server.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/iPhoneLocalAI.app/iPhoneLocalAI"; }; name = Debug; };
+		600000000000000000000006 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = jp.localai.iphone-server.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/iPhoneLocalAI.app/iPhoneLocalAI"; }; name = Release; };
+		B00000000000000000000001 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (600000000000000000000001, 600000000000000000000002,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B00000000000000000000002 /* Build configuration list for PBXNativeTarget iPhoneLocalAI */ = {isa = XCConfigurationList; buildConfigurations = (600000000000000000000003, 600000000000000000000004,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B00000000000000000000003 /* Build configuration list for PBXNativeTarget iPhoneLocalAITests */ = {isa = XCConfigurationList; buildConfigurations = (600000000000000000000005, 600000000000000000000006,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+	};
+	rootObject = 700000000000000000000001 /* Project object */;
+}
