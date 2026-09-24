@@ -1,11 +1,19 @@
 import Foundation
 import Network
 
-private struct HTTPIncomingRequest {
+struct HTTPIncomingRequest {
     let method: String
     let target: String
     let headers: [String: String]
     let body: Data
+}
+
+protocol HTTPResponseSink {
+    func sendJSON(_ object: Any, status: Int) async
+    func beginEventStream() async throws
+    func sendEvent(_ object: Any) async throws
+    func sendDone() async throws
+    func sendStreamError(_ object: Any) async
 }
 
 private enum HTTPParseError: Error {
@@ -13,7 +21,7 @@ private enum HTTPParseError: Error {
     case tooLarge
 }
 
-private final class HTTPConnectionSession {
+private final class HTTPConnectionSession: HTTPResponseSink {
     private let connection: NWConnection
     private var buffer = Data()
     var requestHandler: ((HTTPIncomingRequest, HTTPConnectionSession) -> Void)?
@@ -247,7 +255,7 @@ final class HTTPServer {
         await logs.write(.info, event: "http_server_stopped")
     }
 
-    private func handle(_ request: HTTPIncomingRequest, on session: HTTPConnectionSession) async {
+    func handle(_ request: HTTPIncomingRequest, on session: any HTTPResponseSink) async {
         let url = URLComponents(string: "http://localhost\(request.target)")
         let path = url?.path ?? request.target
         if request.method == "GET", path == "/health" {
@@ -302,7 +310,7 @@ final class HTTPServer {
         }
     }
 
-    private func handleChat(_ body: Data, on session: HTTPConnectionSession) async {
+    private func handleChat(_ body: Data, on session: any HTTPResponseSink) async {
         let adapted: AdaptedChatRequest
         do {
             adapted = try OpenAIRequestAdapter.adapt(body, defaults: inferenceDefaults)
@@ -381,7 +389,7 @@ final class HTTPServer {
         await session.sendJSON(response, status: 200)
     }
 
-    private func sendError(type: String, message: String, requestID: String?, status: Int, on session: HTTPConnectionSession) async {
+    private func sendError(type: String, message: String, requestID: String?, status: Int, on session: any HTTPResponseSink) async {
         var error: [String: Any] = ["type": type, "message": message]
         if let requestID { error["request_id"] = requestID }
         await session.sendJSON(["error": error], status: status)

@@ -4,112 +4,125 @@ import XCTest
 
 final class HTTPServerTests: XCTestCase {
     func testHealthAuthModelsAndNonStreamingChat() async throws {
-        let (server, baseURL) = try await startTestServer(port: 38251)
-        do {
-            let (healthData, healthResponse) = try await URLSession.shared.data(from: baseURL.appendingPathComponent("health"))
-            XCTAssertEqual((healthResponse as? HTTPURLResponse)?.statusCode, 200)
-            let health = try XCTUnwrap(JSONSerialization.jsonObject(with: healthData) as? [String: Any])
-            XCTAssertEqual(health["status"] as? String, "ok")
+        let (server, logs) = makeTestServer()
+        await logs.write(.info, event: "test_log_entry")
 
-            var modelsRequest = URLRequest(url: baseURL.appendingPathComponent("v1/models"))
-            modelsRequest.setValue("Bearer test-key", forHTTPHeaderField: "Authorization")
-            let (modelsData, modelsResponse) = try await URLSession.shared.data(for: modelsRequest)
-            XCTAssertEqual((modelsResponse as? HTTPURLResponse)?.statusCode, 200)
-            let models = try XCTUnwrap(JSONSerialization.jsonObject(with: modelsData) as? [String: Any])
-            let modelList = try XCTUnwrap(models["data"] as? [[String: Any]])
-            XCTAssertEqual(modelList.first?["id"] as? String, "mock-echo")
+        let health = await dispatch(server, method: "GET", path: "/health", authorization: nil)
+        XCTAssertEqual(health.status, 200)
+        let healthBody = try XCTUnwrap(health.jsonBody as? [String: Any])
+        XCTAssertEqual(healthBody["status"] as? String, "ok")
 
-            var capabilitiesRequest = URLRequest(url: baseURL.appendingPathComponent("capabilities"))
-            capabilitiesRequest.setValue("Bearer test-key", forHTTPHeaderField: "Authorization")
-            let (capabilitiesData, capabilitiesResponse) = try await URLSession.shared.data(for: capabilitiesRequest)
-            XCTAssertEqual((capabilitiesResponse as? HTTPURLResponse)?.statusCode, 200)
-            let capabilities = try XCTUnwrap(JSONSerialization.jsonObject(with: capabilitiesData) as? [String: Any])
-            XCTAssertEqual(capabilities["server"] as? String, "iphone-local-ai")
+        let models = await dispatch(server, method: "GET", path: "/v1/models")
+        XCTAssertEqual(models.status, 200)
+        let modelsBody = try XCTUnwrap(models.jsonBody as? [String: Any])
+        let modelList = try XCTUnwrap(modelsBody["data"] as? [[String: Any]])
+        XCTAssertEqual(modelList.first?["id"] as? String, "mock-echo")
 
-            var metricsRequest = URLRequest(url: baseURL.appendingPathComponent("metrics"))
-            metricsRequest.setValue("Bearer test-key", forHTTPHeaderField: "Authorization")
-            let (metricsData, metricsResponse) = try await URLSession.shared.data(for: metricsRequest)
-            XCTAssertEqual((metricsResponse as? HTTPURLResponse)?.statusCode, 200)
-            let metrics = try XCTUnwrap(JSONSerialization.jsonObject(with: metricsData) as? [String: Any])
-            XCTAssertEqual(metrics["model_loaded"] as? Bool, true)
-            let memory = try XCTUnwrap(metrics["memory"] as? [String: Any])
-            XCTAssertNotNil(memory["physical_footprint_mb"] as? Double)
+        let capabilities = await dispatch(server, method: "GET", path: "/capabilities")
+        XCTAssertEqual(capabilities.status, 200)
+        let capabilitiesBody = try XCTUnwrap(capabilities.jsonBody as? [String: Any])
+        XCTAssertEqual(capabilitiesBody["server"] as? String, "iphone-local-ai")
 
-            var logsRequest = URLRequest(url: baseURL.appendingPathComponent("logs"))
-            logsRequest.setValue("Bearer test-key", forHTTPHeaderField: "Authorization")
-            let (logsData, logsResponse) = try await URLSession.shared.data(for: logsRequest)
-            XCTAssertEqual((logsResponse as? HTTPURLResponse)?.statusCode, 200)
-            let logEntries = try XCTUnwrap(JSONSerialization.jsonObject(with: logsData) as? [[String: Any]])
-            XCTAssertFalse(logEntries.isEmpty)
+        let metrics = await dispatch(server, method: "GET", path: "/metrics")
+        XCTAssertEqual(metrics.status, 200)
+        let metricsBody = try XCTUnwrap(metrics.jsonBody as? [String: Any])
+        XCTAssertEqual(metricsBody["model_loaded"] as? Bool, true)
+        let memory = try XCTUnwrap(metricsBody["memory"] as? [String: Any])
+        XCTAssertNotNil(memory["physical_footprint_mb"] as? Double)
 
-            let (_, unauthenticatedMetrics) = try await URLSession.shared.data(from: baseURL.appendingPathComponent("metrics"))
-            XCTAssertEqual((unauthenticatedMetrics as? HTTPURLResponse)?.statusCode, 401)
+        let logsResponse = await dispatch(server, method: "GET", path: "/logs")
+        XCTAssertEqual(logsResponse.status, 200)
+        let logEntries = try XCTUnwrap(logsResponse.jsonBody as? [[String: Any]])
+        XCTAssertFalse(logEntries.isEmpty)
 
-            var chatRequest = URLRequest(url: baseURL.appendingPathComponent("v1/chat/completions"))
-            chatRequest.httpMethod = "POST"
-            chatRequest.setValue("Bearer test-key", forHTTPHeaderField: "Authorization")
-            chatRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            chatRequest.httpBody = Data(#"{"model":"mock-echo","messages":[{"role":"user","content":"hello"}]}"#.utf8)
-            let (chatData, chatResponse) = try await URLSession.shared.data(for: chatRequest)
-            XCTAssertEqual((chatResponse as? HTTPURLResponse)?.statusCode, 200)
-            let completion = try XCTUnwrap(JSONSerialization.jsonObject(with: chatData) as? [String: Any])
-            let choices = try XCTUnwrap(completion["choices"] as? [[String: Any]])
-            let message = try XCTUnwrap(choices.first?["message"] as? [String: Any])
-            XCTAssertTrue((message["content"] as? String)?.contains("Mock response: hello") == true)
-        } catch {
-            await server.stop()
-            throw error
-        }
-        await server.stop()
+        let unauthenticatedMetrics = await dispatch(server, method: "GET", path: "/metrics", authorization: nil)
+        XCTAssertEqual(unauthenticatedMetrics.status, 401)
+
+        let chatBody = Data(#"{"model":"mock-echo","messages":[{"role":"user","content":"hello"}]}"#.utf8)
+        let chat = await dispatch(server, method: "POST", path: "/v1/chat/completions", body: chatBody)
+        XCTAssertEqual(chat.status, 200)
+        let completion = try XCTUnwrap(chat.jsonBody as? [String: Any])
+        let choices = try XCTUnwrap(completion["choices"] as? [[String: Any]])
+        let message = try XCTUnwrap(choices.first?["message"] as? [String: Any])
+        XCTAssertTrue((message["content"] as? String)?.contains("Mock response: hello") == true)
     }
 
     func testStreamingChatReturnsOpenAIEventsAndDoneMarker() async throws {
-        let (server, baseURL) = try await startTestServer(port: 38252)
-        do {
-            var request = URLRequest(url: baseURL.appendingPathComponent("v1/chat/completions"))
-            request.httpMethod = "POST"
-            request.setValue("Bearer test-key", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = Data(#"{"model":"mock-echo","messages":[{"role":"user","content":"stream me"}],"stream":true}"#.utf8)
-            let (data, response) = try await URLSession.shared.data(for: request)
-            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
-            let body = try XCTUnwrap(String(data: data, encoding: .utf8))
-            XCTAssertTrue(body.contains("chat.completion.chunk"))
-            XCTAssertTrue(body.contains("data: [DONE]"))
-            let payloads = body.components(separatedBy: "data: ").dropFirst()
-            var streamedText = ""
-            for payload in payloads {
-                let jsonLine = String(payload.prefix(while: { $0 != "\n" })).trimmingCharacters(in: .whitespacesAndNewlines)
-                guard jsonLine != "[DONE]", let event = try JSONSerialization.jsonObject(with: Data(jsonLine.utf8)) as? [String: Any],
-                      let choices = event["choices"] as? [[String: Any]],
-                      let delta = choices.first?["delta"] as? [String: Any],
-                      let text = delta["content"] as? String else { continue }
-                streamedText += text
-            }
-            XCTAssertEqual(streamedText, "Mock response: stream me")
-        } catch {
-            await server.stop()
-            throw error
+        let (server, _) = makeTestServer()
+        let body = Data(#"{"model":"mock-echo","messages":[{"role":"user","content":"stream me"}],"stream":true}"#.utf8)
+        let response = await dispatch(server, method: "POST", path: "/v1/chat/completions", body: body)
+
+        XCTAssertTrue(response.eventStreamStarted)
+        XCTAssertTrue(response.streamFinished)
+        let firstEvent = try XCTUnwrap(response.events.first as? [String: Any])
+        XCTAssertEqual(firstEvent["object"] as? String, "chat.completion.chunk")
+
+        var streamedText = ""
+        for event in response.events.compactMap({ $0 as? [String: Any] }) {
+            guard let choices = event["choices"] as? [[String: Any]],
+                  let delta = choices.first?["delta"] as? [String: Any],
+                  let text = delta["content"] as? String else { continue }
+            streamedText += text
         }
-        await server.stop()
+        XCTAssertEqual(streamedText, "Mock response: stream me")
     }
 
-    private func startTestServer(port: UInt16) async throws -> (HTTPServer, URL) {
+    private func makeTestServer() -> (HTTPServer, LogService) {
         let metrics = MetricsService()
         let logs = LogService()
         let inference = InferenceService(metrics: metrics, logs: logs)
-        // The simulator test process connects through the simulator's TCP stack. Bind
-        // the test listener on all interfaces so the test exercises real HTTP routing
-        // without depending on loopback endpoint support in the simulator runtime.
         let server = HTTPServer(
-            port: port,
+            port: 38251,
             apiKey: "test-key",
-            allowLAN: true,
+            allowLAN: false,
             inference: inference,
             metrics: metrics,
             logs: logs
         )
-        try await server.start()
-        return (server, URL(string: "http://127.0.0.1:\(port)")!)
+        return (server, logs)
+    }
+
+    private func dispatch(
+        _ server: HTTPServer,
+        method: String,
+        path: String,
+        authorization: String? = "Bearer test-key",
+        body: Data = Data()
+    ) async -> TestHTTPResponseSink {
+        var headers: [String: String] = [:]
+        if let authorization { headers["authorization"] = authorization }
+        let request = HTTPIncomingRequest(method: method, target: path, headers: headers, body: body)
+        let response = TestHTTPResponseSink()
+        await server.handle(request, on: response)
+        return response
+    }
+}
+
+private final class TestHTTPResponseSink: HTTPResponseSink {
+    private(set) var status: Int?
+    private(set) var jsonBody: Any?
+    private(set) var eventStreamStarted = false
+    private(set) var streamFinished = false
+    private(set) var events: [Any] = []
+
+    func sendJSON(_ object: Any, status: Int) async {
+        jsonBody = object
+        self.status = status
+    }
+
+    func beginEventStream() async throws {
+        eventStreamStarted = true
+    }
+
+    func sendEvent(_ object: Any) async throws {
+        events.append(object)
+    }
+
+    func sendDone() async throws {
+        streamFinished = true
+    }
+
+    func sendStreamError(_ object: Any) async {
+        jsonBody = object
     }
 }
