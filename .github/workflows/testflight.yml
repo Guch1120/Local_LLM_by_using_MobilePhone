@@ -20,6 +20,8 @@ jobs:
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v7.0.1
+      - name: Skip LiteRT-LM Git LFS smudging
+        run: git lfs install --skip-smudge
       - name: Check signing and App Store Connect secrets
         run: |
           set -euo pipefail

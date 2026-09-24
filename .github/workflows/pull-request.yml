@@ -13,6 +13,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7.0.1
+      - name: Skip LiteRT-LM Git LFS smudging
+        run: git lfs install --skip-smudge
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project iPhoneLocalAI.xcodeproj -scheme iPhoneLocalAI
       - name: Lint Swift sources
