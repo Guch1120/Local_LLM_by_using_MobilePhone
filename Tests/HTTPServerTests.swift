@@ -39,7 +39,8 @@ final class HTTPServerTests: XCTestCase {
             logsRequest.setValue("Bearer test-key", forHTTPHeaderField: "Authorization")
             let (logsData, logsResponse) = try await URLSession.shared.data(for: logsRequest)
             XCTAssertEqual((logsResponse as? HTTPURLResponse)?.statusCode, 200)
-            XCTAssertNotNil(JSONSerialization.jsonObject(with: logsData) as? [[String: Any]])
+            let logEntries = try XCTUnwrap(JSONSerialization.jsonObject(with: logsData) as? [[String: Any]])
+            XCTAssertFalse(logEntries.isEmpty)
 
             let (_, unauthenticatedMetrics) = try await URLSession.shared.data(from: baseURL.appendingPathComponent("metrics"))
             XCTAssertEqual((unauthenticatedMetrics as? HTTPURLResponse)?.statusCode, 401)
