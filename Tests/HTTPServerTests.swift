@@ -98,7 +98,17 @@ final class HTTPServerTests: XCTestCase {
         let metrics = MetricsService()
         let logs = LogService()
         let inference = InferenceService(metrics: metrics, logs: logs)
-        let server = HTTPServer(port: port, apiKey: "test-key", allowLAN: false, inference: inference, metrics: metrics, logs: logs)
+        // The simulator test process connects through the simulator's TCP stack. Bind
+        // the test listener on all interfaces so the test exercises real HTTP routing
+        // without depending on loopback endpoint support in the simulator runtime.
+        let server = HTTPServer(
+            port: port,
+            apiKey: "test-key",
+            allowLAN: true,
+            inference: inference,
+            metrics: metrics,
+            logs: logs
+        )
         try await server.start()
         return (server, URL(string: "http://127.0.0.1:\(port)")!)
     }
