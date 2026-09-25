@@ -11,7 +11,13 @@ final class AppState: ObservableObject {
     @Published private(set) var installedModels: [InstalledModel] = []
     @Published private(set) var metricsSnapshot: MetricsSnapshot?
     @Published private(set) var logEntries: [LogEntry] = []
-    @Published private(set) var lastError: String?
+    @Published private(set) var lastError: String? {
+        didSet {
+            guard let lastError, lastError != oldValue else { return }
+            Task { await logs.write(.error, event: "app_error", details: lastError) }
+        }
+    }
+    @Published private(set) var logPersistenceStatus: LogPersistenceStatus?
     @Published var port: Int
     @Published private(set) var allowLAN: Bool
     @Published private(set) var defaultMaxTokens: Int
@@ -24,13 +30,20 @@ final class AppState: ObservableObject {
     private let keyStore = APIKeyStore()
     private let modelManager = ModelManager()
     private let metrics = MetricsService()
-    private let logs = LogService()
+    private let logs: LogService
     private var inferenceDefaults: InferenceDefaults
     private lazy var inference = InferenceService(metrics: metrics, logs: logs)
     private var server: HTTPServer?
     private var memoryWarningObserver: NSObjectProtocol? = nil
+    private var debugSessionID = UUID().uuidString
+    private var hasCheckedPreviousSession = false
+    private var appIsActive = false
+    private var observedThermalState: String?
+
+    private static let foregroundSessionKey = "diagnostics.foreground_session_active"
 
     init() {
+        logs = LogService(persistenceURL: Self.diagnosticsLogURL())
         let savedPort = UserDefaults.standard.integer(forKey: "httpPort")
         let savedContextTokens = UserDefaults.standard.integer(forKey: "contextTokens")
         let configuredContextTokens = [1024, 2048, 4096, 8192].contains(savedContextTokens) ? savedContextTokens : InferenceDefaults.standard.contextTokens
@@ -61,6 +74,30 @@ final class AppState: ObservableObject {
 
     var endpoint: String { "http://127.0.0.1:\(port)" }
 
+    func applicationBecameActive() async {
+        guard !appIsActive else { return }
+        appIsActive = true
+        if !hasCheckedPreviousSession, UserDefaults.standard.bool(forKey: Self.foregroundSessionKey) {
+            await logs.write(.error, event: "previous_foreground_session_interrupted", details: "The previous foreground session ended without a background marker.")
+        }
+        hasCheckedPreviousSession = true
+        debugSessionID = UUID().uuidString
+        UserDefaults.standard.set(true, forKey: Self.foregroundSessionKey)
+        await logs.write(.info, event: "app_foregrounded", requestID: debugSessionID)
+    }
+
+    func applicationBecameInactive() async {
+        appIsActive = false
+        await logs.write(.info, event: "app_inactive", requestID: debugSessionID)
+    }
+
+    func applicationEnteredBackground() async {
+        appIsActive = false
+        await logs.write(.info, event: "app_backgrounded", requestID: debugSessionID)
+        UserDefaults.standard.set(false, forKey: Self.foregroundSessionKey)
+        await stopServer()
+    }
+
     func startServer() async {
         guard server == nil, !serverStarting else { return }
         serverStarting = true
@@ -85,7 +122,6 @@ final class AppState: ObservableObject {
             serverRunning = false
             UIApplication.shared.isIdleTimerDisabled = false
             lastError = error.localizedDescription
-            await logs.write(.error, event: "http_server_start_failed", details: error.localizedDescription)
         }
     }
 
@@ -126,6 +162,11 @@ final class AppState: ObservableObject {
     func refresh() async {
         installedModels = await modelManager.list()
         metricsSnapshot = await metrics.snapshot()
+        if let observedThermalState, observedThermalState != metricsSnapshot?.thermalState {
+            await logs.write(.warning, event: "thermal_state_changed", details: "\(observedThermalState)->\(metricsSnapshot?.thermalState ?? "unknown")")
+        }
+        observedThermalState = metricsSnapshot?.thermalState
+        logPersistenceStatus = await logs.persistenceStatus()
         let active = await inference.activeModel()
         let capabilities = await inference.capabilities()
         supportsVision = active.loaded && capabilities.image
@@ -141,7 +182,6 @@ final class AppState: ObservableObject {
             await refresh()
         } catch {
             lastError = "Model import failed: \(error.localizedDescription)"
-            await logs.write(.error, event: "model_import_failed", details: error.localizedDescription)
         }
     }
 
@@ -165,7 +205,6 @@ final class AppState: ObservableObject {
             lastError = nil
         } catch {
             lastError = error.localizedDescription
-            await logs.write(.error, event: "model_load_failed", details: "model=\(id) error=\(error.localizedDescription)")
         }
         await refresh()
     }
@@ -283,7 +322,6 @@ final class AppState: ObservableObject {
                 lastError = nil
             } catch {
                 lastError = "Model reload failed after changing the context limit: \(error.localizedDescription)"
-                await logs.write(.error, event: "model_reload_failed", details: "model=\(id) error=\(error.localizedDescription)")
             }
         }
 
@@ -322,7 +360,6 @@ final class AppState: ObservableObject {
             await logs.write(.info, event: "benchmark_completed", requestID: request.id, details: image == nil ? "kind=text" : "kind=vision")
         } catch {
             lastError = "Benchmark failed: \(error.localizedDescription)"
-            await logs.write(.error, event: "benchmark_failed", requestID: request.id, details: error.localizedDescription)
         }
         await refresh()
     }
@@ -339,5 +376,12 @@ final class AppState: ObservableObject {
         } catch {
             await logs.write(.warning, event: "model_unload_deferred", details: "inference_in_progress")
         }
+    }
+
+    private static func diagnosticsLogURL() -> URL? {
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        return support.appendingPathComponent("iPhoneLocalAI", isDirectory: true)
+            .appendingPathComponent("diagnostics", isDirectory: true)
+            .appendingPathComponent("logs.json")
     }
 }

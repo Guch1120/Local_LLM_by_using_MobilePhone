@@ -67,6 +67,25 @@ final class HTTPServerTests: XCTestCase {
         XCTAssertEqual(streamedText, "Mock response: stream me")
     }
 
+    func testDiagnosticsRequiresBearerAndIncludesDebugBundle() async throws {
+        let (server, logs) = makeTestServer()
+        await logs.write(.warning, event: "diagnostics_test_event", details: "model=mock-echo")
+
+        let unauthorized = await dispatch(server, method: "GET", path: "/diagnostics", authorization: nil)
+        XCTAssertEqual(unauthorized.status, 401)
+
+        let response = await dispatch(server, method: "GET", path: "/diagnostics")
+        XCTAssertEqual(response.status, 200)
+        let body = try XCTUnwrap(response.jsonBody as? [String: Any])
+        let app = try XCTUnwrap(body["app"] as? [String: Any])
+        XCTAssertNotNil(app["version"] as? String)
+        XCTAssertNotNil(app["git_commit_sha"] as? String)
+        let serverState = try XCTUnwrap(body["server"] as? [String: Any])
+        XCTAssertEqual(serverState["port"] as? Int, 38251)
+        let storedLogs = try XCTUnwrap(body["logs"] as? [[String: Any]])
+        XCTAssertTrue(storedLogs.contains { $0["event"] as? String == "diagnostics_test_event" })
+    }
+
     private func makeTestServer() -> (HTTPServer, LogService) {
         let metrics = MetricsService()
         let logs = LogService()

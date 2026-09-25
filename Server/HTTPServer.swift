@@ -264,6 +264,7 @@ final class HTTPServer {
             return
         }
         guard isAuthorized(request.headers["authorization"]) else {
+            await logs.write(.warning, event: "http_authentication_failed", details: "method=\(request.method)")
             await session.sendJSON(["error": ["type": "authentication_error", "message": "A valid bearer token is required."]], status: 401)
             return
         }
@@ -285,16 +286,34 @@ final class HTTPServer {
             await session.sendJSON(response, status: 200)
         case ("GET", "/metrics"):
             do {
-                var response = try await jsonObject(from: await metrics.snapshot()) as? [String: Any] ?? [:]
-                let footprint = response.removeValue(forKey: "physical_footprint_mb") ?? NSNull()
-                response["memory"] = ["physical_footprint_mb": footprint]
-                let backendMetrics = await inference.backendMetrics()
-                response["backend_runtime"] = jsonValue(backendMetrics.computeBackend)
-                response["model_load_milliseconds"] = jsonValue(backendMetrics.modelLoadMilliseconds)
-                response["multi_token_prediction_enabled"] = backendMetrics.multiTokenPredictionEnabled
-                await session.sendJSON(response, status: 200)
+                await session.sendJSON(try await metricsPayload(), status: 200)
             } catch {
                 await sendError(type: "internal_error", message: "Could not encode metrics.", requestID: nil, status: 500, on: session)
+            }
+        case ("GET", "/diagnostics"):
+            do {
+                let active = await inference.activeModel()
+                let logStatus = try await jsonObject(from: await logs.persistenceStatus())
+                let recentLogs = try await jsonObject(from: await logs.list(limit: 200))
+                let info = Bundle.main.infoDictionary ?? [:]
+                let app: [String: Any] = [
+                    "version": info["CFBundleShortVersionString"] as? String ?? "unknown",
+                    "build": info["CFBundleVersion"] as? String ?? "unknown",
+                    "git_commit_sha": info["GitCommitSHA"] as? String ?? "unknown",
+                    "os_version": ProcessInfo.processInfo.operatingSystemVersionString
+                ]
+                let response: [String: Any] = [
+                    "generated_at": ISO8601DateFormatter().string(from: Date()),
+                    "app": app,
+                    "server": ["running": listener != nil, "port": Int(port), "lan_enabled": allowLAN, "foreground_only": true],
+                    "active_model": ["id": jsonValue(active.id), "backend": active.backend, "loaded": active.loaded],
+                    "metrics": try await metricsPayload(),
+                    "log_persistence": logStatus,
+                    "logs": recentLogs
+                ]
+                await session.sendJSON(response, status: 200)
+            } catch {
+                await sendError(type: "internal_error", message: "Could not encode diagnostics.", requestID: nil, status: 500, on: session)
             }
         case ("GET", "/logs"):
             do {
@@ -306,6 +325,7 @@ final class HTTPServer {
             await handleChat(request.body, on: session)
         default:
             let status = ["GET", "POST"].contains(request.method) ? 404 : 405
+            await logs.write(.warning, event: "http_route_not_found", details: "method=\(request.method)")
             await session.sendJSON(["error": ["type": "invalid_request", "message": "Route not found."]], status: status)
         }
     }
@@ -318,9 +338,11 @@ final class HTTPServer {
             let type: String
             if case .unsupportedModality = error { type = "unsupported_modality" }
             else { type = "invalid_request" }
+            await logs.write(.warning, event: "chat_request_rejected", details: "type=\(type)")
             await sendError(type: type, message: error.localizedDescription, requestID: nil, status: 400, on: session)
             return
         } catch {
+            await logs.write(.warning, event: "chat_request_rejected", details: "type=invalid_request")
             await sendError(type: "invalid_request", message: "Invalid chat completion request.", requestID: nil, status: 400, on: session)
             return
         }
@@ -331,6 +353,7 @@ final class HTTPServer {
             stream = try await inference.generate(request)
         } catch {
             let mapped = map(error)
+            await logs.write(.error, event: "inference_request_rejected", requestID: request.id, details: "type=\(mapped.type)")
             await sendError(type: mapped.type, message: mapped.message, requestID: request.id, status: mapped.status, on: session)
             return
         }
@@ -393,6 +416,17 @@ final class HTTPServer {
         var error: [String: Any] = ["type": type, "message": message]
         if let requestID { error["request_id"] = requestID }
         await session.sendJSON(["error": error], status: status)
+    }
+
+    private func metricsPayload() async throws -> [String: Any] {
+        var response = try await jsonObject(from: await metrics.snapshot()) as? [String: Any] ?? [:]
+        let footprint = response.removeValue(forKey: "physical_footprint_mb") ?? NSNull()
+        response["memory"] = ["physical_footprint_mb": footprint]
+        let backendMetrics = await inference.backendMetrics()
+        response["backend_runtime"] = jsonValue(backendMetrics.computeBackend)
+        response["model_load_milliseconds"] = jsonValue(backendMetrics.modelLoadMilliseconds)
+        response["multi_token_prediction_enabled"] = backendMetrics.multiTokenPredictionEnabled
+        return response
     }
 
     private func isAuthorized(_ header: String?) -> Bool {

@@ -5,10 +5,11 @@ An iOS app that exposes a local, OpenAI-compatible inference API so a nearby PC 
 ## Current implementation
 
 - SwiftUI management screens for server status, imported models, settings, diagnostics, and logs.
-- An authenticated HTTP server with `/health`, `/capabilities`, `/metrics`, `/logs`, `/v1/models`, and `/v1/chat/completions` routes.
+- An authenticated HTTP server with `/health`, `/capabilities`, `/diagnostics`, `/metrics`, `/logs`, `/v1/models`, and `/v1/chat/completions` routes.
 - Non-streaming and Server-Sent Events chat completions, including JPEG/PNG data URL parsing.
 - Image inputs are orientation-corrected, resized to a 2048-pixel maximum edge, and recompressed as JPEG before inference.
 - A `MockInferenceBackend` for API and UI development without a model or Apple Silicon.
+- A persistent, 500-entry on-device diagnostic log with app lifecycle, model, inference, thermal, and error events. Prompt and image contents are not recorded.
 - Model file import into Application Support with a streaming SHA-256 calculation.
 - Saved generation defaults for output length, temperature, LiteRT context length, and experimental Multi-Token Prediction.
 - A privacy manifest for app-local UserDefaults and model-file metadata access; no app tracking or collected data is declared.
@@ -45,6 +46,21 @@ Check the server and list the active model:
 curl http://127.0.0.1:8080/health
 curl -H "Authorization: Bearer <API_KEY>" http://127.0.0.1:8080/v1/models
 ```
+
+## Remote debugging without a Mac
+
+The app must remain in the foreground while the API is in use. Once USB forwarding is connected, collect the single diagnostics bundle from Ubuntu:
+
+```bash
+curl -fsS -H "Authorization: Bearer <API_KEY>" \
+  http://127.0.0.1:8080/diagnostics | tee iphone-diagnostics.json | jq .
+```
+
+The bundle includes the app version, build number, Git revision, iOS version, server/model state, memory and thermal metrics, inference timings, log-storage health, and up to 200 recent log entries. Logs survive app relaunches and retain at most 500 entries on the iPhone. They contain lifecycle and error descriptions but not prompt text or image data. The API key is never included in the bundle.
+
+For a smaller live view, use `GET /health`, `GET /metrics`, or `GET /logs`. All except `/health` require the bearer token. The Settings screen shows the API key; rotate it there if it is exposed.
+
+GitHub Actions attaches the source revision to each built app, so a diagnostics bundle identifies the exact commit running on the phone. Pushes to `iphone` or `main` run the unsigned Simulator build workflow. After Apple Developer Program approval and a TestFlight install, the same USB-forwarded endpoints can be used to report app behavior from Ubuntu without Xcode. This remote path provides application logs and health/performance state; LLDB breakpoints, view hierarchy inspection, Metal debugging, and Instruments still require a Mac.
 
 The OpenAI Python client can use the active model ID returned by `/v1/models`:
 

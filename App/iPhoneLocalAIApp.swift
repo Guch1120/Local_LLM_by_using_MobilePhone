@@ -10,6 +10,7 @@ struct IPhoneLocalAIApp: App {
             MainTabView()
                 .environmentObject(appState)
                 .task {
+                    await appState.applicationBecameActive()
                     await appState.startServer()
                     await appState.refresh()
                     while !Task.isCancelled {
@@ -20,9 +21,12 @@ struct IPhoneLocalAIApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     Task {
                         if phase == .active {
+                            await appState.applicationBecameActive()
                             await appState.startServer()
+                        } else if phase == .inactive {
+                            await appState.applicationBecameInactive()
                         } else if phase == .background {
-                            await appState.stopServer()
+                            await appState.applicationEnteredBackground()
                         }
                     }
                 }

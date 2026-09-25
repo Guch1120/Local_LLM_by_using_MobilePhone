@@ -6,6 +6,15 @@ struct DiagnosticsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("App build") {
+                    metric("Version / build", value: appBuildText, symbol: "number.square")
+                    metric("Git revision", value: gitRevision, symbol: "chevron.left.forwardslash.chevron.right")
+                    metric("Saved log entries", value: "\(appState.logPersistenceStatus?.entryCount ?? appState.logEntries.count)", symbol: "externaldrive")
+                    metric("Log storage", value: logStorageText, symbol: "checkmark.icloud")
+                    if let error = appState.logPersistenceStatus?.lastError {
+                        Text(error).font(.footnote).foregroundStyle(.red).textSelection(.enabled)
+                    }
+                }
                 Section("Device") {
                     metric("Thermal state", value: appState.metricsSnapshot?.thermalState.capitalized ?? "—", symbol: "thermometer.medium")
                     metric("Physical footprint", value: memoryText, symbol: "memorychip")
@@ -75,6 +84,24 @@ struct DiagnosticsView: View {
     private var memoryText: String {
         guard let megabytes = appState.metricsSnapshot?.physicalFootprintMB else { return "—" }
         return String(format: "%.1f MB", megabytes)
+    }
+
+    private var appBuildText: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let version = info["CFBundleShortVersionString"] as? String ?? "unknown"
+        let build = info["CFBundleVersion"] as? String ?? "unknown"
+        return "\(version) (\(build))"
+    }
+
+    private var gitRevision: String {
+        let revision = Bundle.main.infoDictionary?["GitCommitSHA"] as? String ?? "unknown"
+        return revision.count > 12 ? String(revision.prefix(12)) : revision
+    }
+
+    private var logStorageText: String {
+        guard let status = appState.logPersistenceStatus else { return "Checking…" }
+        if !status.enabled { return "In memory only" }
+        return status.healthy ? "Saved on iPhone" : "Save error"
     }
 
     private var uptimeText: String {

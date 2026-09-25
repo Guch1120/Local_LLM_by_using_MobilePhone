@@ -11,6 +11,25 @@ final class SecurityAndModelTests: XCTestCase {
         XCTAssertFalse(BearerTokenAuthenticator.matches("Bearer abc123 ", expectedToken: "abc123"))
     }
 
+    func testDiagnosticLogsPersistAcrossServiceInstances() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let archiveURL = root.appendingPathComponent("diagnostics/logs.json")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let first = LogService(capacity: 3, persistenceURL: archiveURL)
+        await first.write(.error, event: "persisted_error", details: "safe diagnostic detail")
+        let initialStatus = await first.persistenceStatus()
+        XCTAssertTrue(initialStatus.enabled)
+        XCTAssertTrue(initialStatus.healthy)
+
+        let relaunched = LogService(capacity: 3, persistenceURL: archiveURL)
+        let entries = await relaunched.list()
+        XCTAssertEqual(entries.first?.event, "persisted_error")
+        XCTAssertEqual(entries.first?.details, "safe diagnostic detail")
+        let relaunchedStatus = await relaunched.persistenceStatus()
+        XCTAssertTrue(relaunchedStatus.healthy)
+    }
+
     func testModelImportCopiesFileAndVerifiesDigest() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let modelDirectory = root.appendingPathComponent("Models", isDirectory: true)

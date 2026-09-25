@@ -26,6 +26,7 @@ jobs:
           xcodebuild -project iPhoneLocalAI.xcodeproj
           -scheme iPhoneLocalAI
           -destination 'generic/platform=iOS Simulator'
+          GIT_COMMIT_SHA="$GITHUB_SHA"
           EXCLUDED_ARCHS=x86_64
           CODE_SIGNING_ALLOWED=NO build
       - name: Run unit tests
@@ -33,5 +34,6 @@ jobs:
           xcodebuild -project iPhoneLocalAI.xcodeproj
           -scheme iPhoneLocalAI
           -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5'
+          GIT_COMMIT_SHA="$GITHUB_SHA"
           EXCLUDED_ARCHS=x86_64
           CODE_SIGNING_ALLOWED=NO test
