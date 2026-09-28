@@ -22,7 +22,7 @@ Camera capture, microphone/audio, speech recognition, TTS, embeddings, RAG, ROS,
 
 ## Current stage
 
-The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, `.litertlm` model import/verification, generation defaults, diagnostics, benchmark actions, and unit/integration tests are implemented. LiteRT-LM 0.17.1 is connected behind the backend protocol with Metal-first initialization and CPU fallback. The app and tests have not yet been built because this Ubuntu environment has no Xcode toolchain. Device inference, GPU operation, USB forwarding, signing, and TestFlight upload still need verification. The Apple Developer Program application is pending, so signed device distribution is not currently available.
+The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, `.litertlm` model import/verification, generation defaults, diagnostics, benchmark actions, and unit/integration tests are implemented. LiteRT-LM 0.17.1 is connected behind the backend protocol with Metal-first initialization and CPU fallback. The app and tests are developed primarily from Ubuntu and validated with the macOS GitHub Actions workflows because the local development environment has no Xcode toolchain. Device inference, GPU operation, USB forwarding, signing, and TestFlight upload still need physical-device verification. The Apple Developer Program membership is active, and the explicit App ID `jp.localai.iphone-server` has been registered. TestFlight distribution now depends on completing the App Store Connect record, signing assets, API-key setup, and repository secrets described in `TESTFLIGHT_SETUP.md`.
 
 ## API behavior
 
