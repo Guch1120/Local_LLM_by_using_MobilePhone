@@ -97,5 +97,6 @@ The provisioning profile must use bundle identifier `jp.localai.iphone-server`. 
 ## Project notes
 
 - See [SPEC.md](SPEC.md) for scope and staged implementation.
+- See [TESTFLIGHT_SETUP.md](TESTFLIGHT_SETUP.md) for Apple Developer, signing, GitHub Secrets, and TestFlight deployment setup.
 - See [AGENTS.md](AGENTS.md) for repository rules and build commands.
 - Never commit App Store Connect credentials, signing certificates, API keys, or model files.
