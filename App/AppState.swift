@@ -42,6 +42,9 @@ final class AppState: ObservableObject {
     private var observedThermalState: String?
 
     private static let foregroundSessionKey = "diagnostics.foreground_session_active"
+    private static let lastLoadedModelKey = "lastLoadedModelID"
+    private static let autoLoadInProgressKey = "autoLoadInProgress"
+    private var hasAttemptedAutoLoad = false
 
     init() {
         logs = LogService(persistenceURL: Self.diagnosticsLogURL())
@@ -112,7 +115,10 @@ final class AppState: ObservableObject {
                 inference: inference,
                 inferenceDefaults: inferenceDefaults,
                 metrics: metrics,
-                logs: logs
+                logs: logs,
+                modelLoader: { [weak self] id in
+                    await self?.loadModelOnDemand(id) ?? false
+                }
             )
             try await service.start()
             server = service
@@ -203,6 +209,35 @@ final class AppState: ObservableObject {
         await refresh()
     }
 
+    /// Reloads the model that was loaded last time, so the API is usable again after a
+    /// restart without touching the phone. Skipped once if the previous auto-load never
+    /// finished (for example the app was killed for memory while loading).
+    func autoLoadLastModel() async {
+        guard !hasAttemptedAutoLoad else { return }
+        hasAttemptedAutoLoad = true
+        guard let id = UserDefaults.standard.string(forKey: Self.lastLoadedModelKey) else { return }
+        if UserDefaults.standard.bool(forKey: Self.autoLoadInProgressKey) {
+            UserDefaults.standard.set(false, forKey: Self.autoLoadInProgressKey)
+            await logs.write(.warning, event: "model_auto_load_skipped", details: "The previous automatic load did not finish. model=\(id)")
+            return
+        }
+        guard await modelManager.model(id: id) != nil else {
+            UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
+            return
+        }
+        UserDefaults.standard.set(true, forKey: Self.autoLoadInProgressKey)
+        await logs.write(.info, event: "model_auto_load_started", details: "model=\(id)")
+        await loadModel(id)
+        UserDefaults.standard.set(false, forKey: Self.autoLoadInProgressKey)
+    }
+
+    /// Called by the HTTP server when a chat request names an installed model that is not active.
+    func loadModelOnDemand(_ id: String) async -> Bool {
+        guard await modelManager.model(id: id) != nil else { return false }
+        await loadModel(id)
+        return await inference.activeModel().id == id
+    }
+
     func loadModel(_ id: String) async {
         guard !modelLoading, !benchmarkRunning else { return }
         modelLoading = true
@@ -220,6 +255,7 @@ final class AppState: ObservableObject {
                 throw InferenceError.backendUnavailable("The model file is missing or its SHA-256 no longer matches the registry.")
             }
             try await inference.loadImportedModel(model, contextTokens: contextTokens, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
+            UserDefaults.standard.set(id, forKey: Self.lastLoadedModelKey)
             lastError = nil
         } catch {
             lastError = error.localizedDescription
@@ -237,6 +273,7 @@ final class AppState: ObservableObject {
         }
         do {
             try await inference.unloadModel()
+            UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
             await refresh()
         } catch {
             lastError = error.localizedDescription
@@ -257,6 +294,9 @@ final class AppState: ObservableObject {
                 try await inference.unloadModel()
             }
             try await modelManager.removeModel(id: id)
+            if UserDefaults.standard.string(forKey: Self.lastLoadedModelKey) == id {
+                UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
+            }
             await logs.write(.info, event: "model_removed", details: "model=\(id)")
             await refresh()
         } catch {

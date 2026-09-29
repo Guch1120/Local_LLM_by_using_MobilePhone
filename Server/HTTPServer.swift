@@ -190,10 +190,13 @@ final class HTTPServer {
     private let inferenceDefaults: InferenceDefaults
     private let metrics: MetricsService
     private let logs: LogService
+    /// Loads an installed model by ID when a chat request names a model that is not active.
+    /// Returns true when that model is active afterwards.
+    private let modelLoader: (@Sendable (String) async -> Bool)?
     private let queue = DispatchQueue(label: "jp.localai.iphone-server.http", qos: .userInitiated)
     private var listener: NWListener?
 
-    init(port: UInt16, apiKey: String, allowLAN: Bool, inference: InferenceService, inferenceDefaults: InferenceDefaults = .standard, metrics: MetricsService, logs: LogService) {
+    init(port: UInt16, apiKey: String, allowLAN: Bool, inference: InferenceService, inferenceDefaults: InferenceDefaults = .standard, metrics: MetricsService, logs: LogService, modelLoader: (@Sendable (String) async -> Bool)? = nil) {
         self.port = port
         self.apiKey = apiKey
         self.allowLAN = allowLAN
@@ -201,6 +204,7 @@ final class HTTPServer {
         self.inferenceDefaults = inferenceDefaults
         self.metrics = metrics
         self.logs = logs
+        self.modelLoader = modelLoader
     }
 
     func start() async throws {
@@ -350,6 +354,10 @@ final class HTTPServer {
         }
 
         let request = adapted.inferenceRequest
+        if let modelLoader, await inference.activeModel().id != request.model {
+            await logs.write(.info, event: "model_load_on_demand", requestID: request.id, details: "model=\(request.model)")
+            _ = await modelLoader(request.model)
+        }
         let stream: AsyncThrowingStream<InferenceChunk, Error>
         do {
             stream = try await inference.generate(request)

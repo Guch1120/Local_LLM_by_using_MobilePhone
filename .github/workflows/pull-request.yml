@@ -3,6 +3,7 @@ name: iOS pull request
 # macOS runner minutes are billed at a much higher rate than Linux minutes, so
 # this workflow runs only for pull requests (or on demand), lints on Linux
 # first, and runs the Simulator build and tests in a single macOS step.
+# Start manually with: gh workflow run pull-request.yml --ref iphone
 
 on:
   pull_request:

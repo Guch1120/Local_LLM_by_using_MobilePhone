@@ -14,6 +14,7 @@ struct IPhoneLocalAIApp: App {
                     await appState.startServer()
                     await appState.refresh()
                     await appState.importModelsFromDocuments()
+                    await appState.autoLoadLastModel()
                     while !Task.isCancelled {
                         try? await Task.sleep(for: .seconds(3))
                         await appState.refresh()

@@ -1,5 +1,8 @@
 name: TestFlight
 
+# Distribution build for App Store Connect / TestFlight. Start manually:
+#   gh workflow run testflight.yml --ref iphone
+
 on:
   workflow_dispatch:
 

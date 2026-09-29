@@ -88,6 +88,35 @@ final class HTTPServerTests: XCTestCase {
         XCTAssertTrue(storedLogs.contains { $0["event"] as? String == "diagnostics_test_event" })
     }
 
+    func testChatAsksLoaderForInactiveModel() async throws {
+        let requested = RequestedModels()
+        let metrics = MetricsService()
+        let logs = LogService()
+        let server = HTTPServer(
+            port: 38252,
+            apiKey: "test-key",
+            allowLAN: false,
+            inference: InferenceService(metrics: metrics, logs: logs),
+            metrics: metrics,
+            logs: logs,
+            modelLoader: { id in
+                await requested.append(id)
+                return false
+            }
+        )
+        let body = Data(#"{"model":"not-installed","messages":[{"role":"user","content":"hi"}]}"#.utf8)
+
+        let response = await dispatch(server, method: "POST", path: "/v1/chat/completions", body: body)
+        XCTAssertEqual(response.status, 404)
+        let ids = await requested.ids
+        XCTAssertEqual(ids, ["not-installed"])
+
+        let active = await dispatch(server, method: "POST", path: "/v1/chat/completions", body: Data(#"{"model":"mock-echo","messages":[{"role":"user","content":"hi"}]}"#.utf8))
+        XCTAssertEqual(active.status, 200)
+        let idsAfterActive = await requested.ids
+        XCTAssertEqual(idsAfterActive, ["not-installed"])
+    }
+
     private func makeTestServer() -> (HTTPServer, LogService) {
         let metrics = MetricsService()
         let logs = LogService()
@@ -146,4 +175,9 @@ private final class TestHTTPResponseSink: HTTPResponseSink {
     func sendStreamError(_ object: Any) async {
         jsonBody = object
     }
+}
+
+private actor RequestedModels {
+    private(set) var ids: [String] = []
+    func append(_ id: String) { ids.append(id) }
 }

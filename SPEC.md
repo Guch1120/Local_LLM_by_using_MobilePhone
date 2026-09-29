@@ -27,7 +27,8 @@ The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, 
 ## API behavior
 
 - All API routes except `/health` require `Authorization: Bearer <key>`.
-- `POST /v1/chat/completions` accepts string content or an array containing text and `image_url` data URLs.
+- `POST /v1/chat/completions` accepts string content or an array containing text and `image_url` data URLs. If `model` names an installed model that is not active, the server loads it before generating (the request waits for the load); unknown models return `model_not_found`.
+- The last successfully loaded model is loaded again automatically when the app starts. If the app was terminated during that automatic load, the next launch skips it once.
 - Image payloads are limited to JPEG/PNG and 12 MiB before normalization to a 2048-pixel maximum edge JPEG.
 - Model context length and Multi-Token Prediction are configurable; MTP is reported from the active LiteRT backend.
 - Logs omit prompt and image contents.

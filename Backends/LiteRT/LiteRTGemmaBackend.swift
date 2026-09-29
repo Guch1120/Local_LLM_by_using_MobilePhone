@@ -26,7 +26,9 @@ actor LiteRTGemmaBackend: InferenceBackend {
             let gpuConfig = try EngineConfig(
                 modelPath: configuration.fileURL.path,
                 backend: .gpu,
-                visionBackend: .cpu(),
+                // Google's Gallery app pairs the vision executor with the main backend;
+                // a CPU vision executor next to a GPU engine hung image requests on iPhone.
+                visionBackend: .gpu,
                 maxNumTokens: configuration.contextTokens,
                 cacheDir: cacheURL.path
             )
