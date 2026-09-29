@@ -1,6 +1,6 @@
 # TestFlight setup
 
-This repository already contains a manual GitHub Actions workflow at `.github/workflows/testflight.yml` that builds, signs, exports, and uploads `iPhoneLocalAI` to App Store Connect.
+This repository uses **automatic signing with Apple cloud-managed distribution certificates** for TestFlight. GitHub Actions authenticates `xcodebuild` with an App Store Connect API key, so no local Apple Distribution `.p12` or manually downloaded provisioning profile is required.
 
 The app bundle identifier is:
 
@@ -8,11 +8,9 @@ The app bundle identifier is:
 jp.localai.iphone-server
 ```
 
-Do not commit certificates, provisioning profiles, App Store Connect API keys, or passwords.
+Do not commit App Store Connect API keys or other credentials.
 
 ## Apple-side prerequisites
-
-Complete these steps in Apple Developer / App Store Connect before running the workflow.
 
 ### 1. App ID
 
@@ -35,11 +33,9 @@ Bundle ID: jp.localai.iphone-server
 SKU: iphone-local-ai-001
 ```
 
-The primary language may be Japanese. User access can remain unrestricted inside App Store Connect.
-
 ### 3. App Store Connect API key
 
-In App Store Connect, open **Users and Access -> Integrations -> App Store Connect API** and create a team API key that can upload builds.
+In App Store Connect, open **Users and Access -> Integrations -> App Store Connect API** and create a Team API key that can distribute builds.
 
 Record:
 
@@ -49,23 +45,7 @@ Record:
 
 The private key is only downloadable once. Store it securely and never commit it.
 
-### 4. Apple Distribution certificate
-
-Create or obtain an **Apple Distribution** certificate for the same Apple Developer team.
-
-The GitHub Actions workflow expects the certificate exported as a password-protected PKCS#12 file (`.p12`).
-
-On a Mac, the certificate and its matching private key can be exported from Keychain Access as a `.p12`. If the private key does not exist on the Mac that generated/imported the certificate, the certificate alone cannot be exported as a usable signing identity.
-
-### 5. App Store provisioning profile
-
-Create an **App Store Connect** distribution provisioning profile for:
-
-```text
-jp.localai.iphone-server
-```
-
-Select the Apple Distribution certificate used above and download the resulting `.mobileprovision` file.
+The workflow passes this key to `xcodebuild` with `-authenticationKeyPath`, `-authenticationKeyID`, `-authenticationKeyIssuerID`, and `-allowProvisioningUpdates`. This allows Xcode to communicate with Apple and use automatic/cloud-managed signing.
 
 ## GitHub repository secrets
 
@@ -73,7 +53,7 @@ Open:
 
 **GitHub repository -> Settings -> Secrets and variables -> Actions -> New repository secret**
 
-Create all of the following secrets.
+Create these four secrets:
 
 | Secret | Value |
 | --- | --- |
@@ -81,19 +61,6 @@ Create all of the following secrets.
 | `APPSTORE_API_KEY_ID` | App Store Connect API Key ID |
 | `APPSTORE_API_PRIVATE_KEY` | Entire contents of `AuthKey_<KEY_ID>.p8` |
 | `APPLE_TEAM_ID` | Apple Developer Team ID |
-| `IOS_DISTRIBUTION_CERTIFICATE_P12` | Base64-encoded `.p12` |
-| `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` | Password used when exporting the `.p12` |
-| `IOS_PROVISIONING_PROFILE_BASE64` | Base64-encoded `.mobileprovision` |
-| `KEYCHAIN_PASSWORD` | A strong temporary password used only for the CI keychain |
-
-For macOS/Linux, encode the binary files without line wrapping:
-
-```bash
-base64 < AppleDistribution.p12 | tr -d '\n'
-base64 < iPhoneLocalAI_AppStore.mobileprovision | tr -d '\n'
-```
-
-Paste the resulting single-line strings into the corresponding GitHub secrets.
 
 For `APPSTORE_API_PRIVATE_KEY`, paste the PEM text itself, including:
 
@@ -103,9 +70,31 @@ For `APPSTORE_API_PRIVATE_KEY`, paste the PEM text itself, including:
 -----END PRIVATE KEY-----
 ```
 
-## Run the TestFlight workflow
+Do **not** base64-encode the `.p8` for this workflow.
 
-The workflow is intentionally manual.
+The previous manual-signing secrets are no longer used:
+
+```text
+IOS_DISTRIBUTION_CERTIFICATE_P12
+IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
+IOS_PROVISIONING_PROFILE_BASE64
+KEYCHAIN_PASSWORD
+```
+
+They may be deleted from GitHub Secrets if they were created.
+
+## How signing works
+
+The Xcode project uses automatic signing. During the GitHub Actions run:
+
+1. the App Store Connect API key is written to the temporary runner;
+2. `xcodebuild archive` authenticates to Apple with that key and allows provisioning updates;
+3. `xcodebuild -exportArchive` uses `signingStyle=automatic` and `destination=upload`;
+4. Xcode uses Apple's cloud-managed distribution signing infrastructure to sign the distribution build and upload it to App Store Connect.
+
+No distribution private key is stored in the repository or GitHub Secrets.
+
+## Run the TestFlight workflow
 
 1. Open **Actions** in GitHub.
 2. Select **TestFlight**.
@@ -116,13 +105,12 @@ The workflow is intentionally manual.
 The workflow will:
 
 1. resolve Swift packages;
-2. run the simulator unit tests;
-3. install the signing certificate and provisioning profile into an isolated CI keychain;
-4. archive the Release build for iOS;
-5. export an App Store Connect IPA;
-6. upload it with `iTMSTransporter`.
+2. run simulator unit tests;
+3. archive the Release build with automatic signing;
+4. export and cloud-sign the distribution build;
+5. upload it directly to App Store Connect.
 
-The build number is set from `GITHUB_RUN_NUMBER`, so repeated uploads automatically receive a new build number.
+The build number is set from `GITHUB_RUN_NUMBER`, so repeated workflow runs receive different build numbers.
 
 ## After upload
 
@@ -130,7 +118,7 @@ In App Store Connect:
 
 1. Open **Apps -> iPhone Local AI -> TestFlight**.
 2. Wait for Apple processing to complete.
-3. If Apple asks for export-compliance information, answer it for the app/build.
+3. Answer any export-compliance questions Apple presents for the build.
 4. Create or use an Internal Testing group.
 5. Add the App Store Connect user that will test the app.
 6. Add the processed build to the group.
@@ -140,19 +128,18 @@ Internal TestFlight distribution does not publish the app on the public App Stor
 
 ## Common failure checks
 
-### Missing or invalid signing identity
+### Authentication or cloud-signing authorization failure
 
-Verify that the `.p12` contains both the Apple Distribution certificate and its private key, that the password matches, and that the certificate is not expired.
+Verify all three App Store Connect API values and the exact private-key contents. The API key must have sufficient App Store Connect permissions for distribution. Account Holders and Admins can cloud-sign for App Store Connect distribution by default; other roles may require the relevant cloud-managed distribution certificate permission.
 
-### Provisioning profile does not match
+### Automatic provisioning failure
 
-The profile must be an App Store Connect distribution profile for exactly:
+Verify that:
 
-```text
-jp.localai.iphone-server
-```
-
-It must use the same developer team and a compatible Apple Distribution certificate.
+- `APPLE_TEAM_ID` is the team that owns the App ID;
+- the explicit App ID `jp.localai.iphone-server` exists;
+- the App Store Connect app record uses the same Bundle ID;
+- the API key belongs to that App Store Connect team.
 
 ### Bundle ID mismatch
 
@@ -161,8 +148,6 @@ The following must all match:
 - Apple Developer App ID
 - App Store Connect app record
 - `PRODUCT_BUNDLE_IDENTIFIER` in `iPhoneLocalAI.xcodeproj`
-- provisioning profile
-- `ExportOptions.plist` generated by the workflow
 
 Current expected value:
 
@@ -170,13 +155,9 @@ Current expected value:
 jp.localai.iphone-server
 ```
 
-### App Store Connect authentication failure
-
-Check `APPSTORE_ISSUER_ID`, `APPSTORE_API_KEY_ID`, and the exact private-key contents. Do not base64-encode the `.p8` for this workflow.
-
 ## Security notes
 
-- Never paste Apple signing material into an issue, pull request, commit, or chat log.
-- Repository secrets are the only intended storage location for CI credentials in this project.
+- Never paste the App Store Connect private key into an issue, pull request, commit, or public log.
+- Repository secrets are the intended CI storage location for the API credentials.
 - Rotate the App Store Connect API key if it is exposed.
-- Revoke and replace the distribution certificate if its private key is exposed.
+- Cloud-managed distribution private keys remain in Apple's cloud signing infrastructure rather than being exported as local `.p12` files.
