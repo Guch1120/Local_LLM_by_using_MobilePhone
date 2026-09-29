@@ -62,6 +62,13 @@ jobs:
           GIT_COMMIT_SHA="$GITHUB_SHA"
           archive
 
+      - name: Verify embedded frameworks are loadable
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/iPhoneLocalAI.xcarchive/Products/Applications/iPhoneLocalAI.app"
+          test -f "$APP/Frameworks/CLiteRTLM.framework/CLiteRTLM" || { echo "CLiteRTLM.framework is not embedded"; exit 1; }
+          otool -l "$APP/iPhoneLocalAI" | grep -A2 LC_RPATH | grep -q '@executable_path/Frameworks' || { echo "Missing @executable_path/Frameworks rpath"; exit 1; }
+
       - name: Export and upload with cloud-managed signing
         run: |
           set -euo pipefail
