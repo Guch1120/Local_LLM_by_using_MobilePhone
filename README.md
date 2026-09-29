@@ -77,6 +77,83 @@ print(response.choices[0].message.content)
 
 The mock backend returns deterministic text and does not load imported model files. Imported `.litertlm` files can be selected for the LiteRT backend. Physical-device model inference, LiteRT GPU operation, USB forwarding, and TestFlight upload still need verification.
 
+
+## Ubuntu から iPhone 実機を確認する
+
+Ubuntu 開発PCから USB 接続した iPhone の状態確認、スクリーンショット取得、syslog 取得、HTTP API のポート転送を行うための補助スクリプトを `scripts/iphone/` に用意しています。
+
+```text
+scripts/iphone/
+  check.sh        # USB接続・Developer Mode・CoreDevice の確認
+  screenshot.sh   # iPhone画面をPNGとして取得
+  syslog.sh       # iPhoneのsystem logを取得
+  proxy.sh        # USB経由でPC側ポートをiPhoneへ転送
+  get_api_key.sh  # iPhoneのクリップボードからAPIキーを読み込む
+```
+
+初回セットアップ手順は [IPHONE_USB_SETUP.md](IPHONE_USB_SETUP.md) を参照してください。Developer Mode の有効化と DeveloperDiskImage のマウントまで完了していれば、通常は次のコマンドで接続状態を確認できます。
+
+```bash
+bash scripts/iphone/check.sh
+```
+
+iPhone のスクリーンショットを取得する場合:
+
+```bash
+bash scripts/iphone/screenshot.sh
+xdg-open artifacts/iphone/latest.png
+```
+
+iPhone の system log を確認する場合:
+
+```bash
+bash scripts/iphone/syslog.sh
+```
+
+アプリ名などで絞り込む場合:
+
+```bash
+bash scripts/iphone/syslog.sh "iPhoneLocalAI"
+```
+
+OpenAI互換HTTP APIへUSB経由で接続する場合は、別ターミナルで次を起動したままにします。
+
+```bash
+bash scripts/iphone/proxy.sh
+```
+
+デフォルトでは次のように転送されます。
+
+```text
+Ubuntu 127.0.0.1:8080 -> USB -> iPhone:8080
+```
+
+疎通確認:
+
+```bash
+curl http://127.0.0.1:8080/health
+```
+
+認証が必要なエンドポイントでは、iPhone アプリ内で API キーをコピーしてから、Ubuntu 側で次を実行します。
+
+```bash
+source scripts/iphone/get_api_key.sh
+```
+
+このスクリプトは iPhone のクリップボードを `pymobiledevice3` で読み取り、現在のシェルに `API_KEY` 環境変数として設定します。キーそのものは端末に表示しません。クリップボードが空の場合はエラーになります。
+
+設定後は、そのまま次のように使えます。
+
+```bash
+curl \
+  -H "Authorization: Bearer $API_KEY" \
+  http://127.0.0.1:8080/v1/models
+```
+
+現在のシェルに変数を残すため、`get_api_key.sh` は `bash scripts/iphone/get_api_key.sh` ではなく必ず `source scripts/iphone/get_api_key.sh` で実行してください。
+
+取得したスクリーンショットやログは `artifacts/iphone/` 以下に保存され、このディレクトリは Git 管理対象外です。
+
 ## GitHub Actions secrets
 
 The TestFlight workflow is manual and uses Xcode automatic signing with Apple's cloud-managed distribution certificates. Before running it, configure these repository secrets:
