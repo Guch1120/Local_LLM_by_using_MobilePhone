@@ -87,6 +87,12 @@ if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$encrypted" -out "$ip
   exit 1
 fi
 
+pymobiledevice3 mounter auto-mount >/dev/null 2>&1 || true
+# installd waits forever if the running app resists termination (the foreground
+# server keeps the screen awake), so stop it first.
+echo "[INFO] Stopping the running app before install..."
+pymobiledevice3 developer dvt pkill --bundle "$bundle_id" >/dev/null 2>&1 || true
+
 echo "[INFO] Installing $(basename "$ipa") (run $run_id)..."
 pymobiledevice3 apps install "$ipa"
 echo "[OK] Installed $bundle_id from run $run_id"

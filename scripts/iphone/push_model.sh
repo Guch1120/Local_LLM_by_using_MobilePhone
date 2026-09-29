@@ -55,6 +55,7 @@ async def main(bundle_id: str, local_path: str) -> None:
         await service.rename(partial_path, final_path)
     finally:
         await service.close()
+        await lockdown.close()
     print(f"[OK] Uploaded {final_path}")
 
 
