@@ -181,129 +181,6 @@ final class AppState: ObservableObject {
         if apiKey.isEmpty { apiKey = (try? keyStore.loadOrCreate()) ?? "" }
     }
 
-    func importModels(from urls: [URL]) async {
-        do {
-            for url in urls { _ = try await modelManager.importModel(from: url) }
-            await logs.write(.info, event: "models_imported", details: "count=\(urls.count)")
-            lastError = nil
-            await refresh()
-        } catch {
-            lastError = "Model import failed: \(error.localizedDescription)"
-        }
-    }
-
-    /// Imports `.litertlm` files placed in the app's Documents folder (USB file transfer or Files app).
-    func importModelsFromDocuments() async {
-        guard !modelImporting else { return }
-        modelImporting = true
-        defer { modelImporting = false }
-        do {
-            let imported = try await modelManager.importInbox()
-            if !imported.isEmpty {
-                await logs.write(.info, event: "models_imported_from_documents", details: "count=\(imported.count)")
-                lastError = nil
-            }
-        } catch {
-            lastError = "Model import from Documents failed: \(error.localizedDescription)"
-        }
-        await refresh()
-    }
-
-    /// Reloads the model that was loaded last time, so the API is usable again after a
-    /// restart without touching the phone. Skipped once if the previous auto-load never
-    /// finished (for example the app was killed for memory while loading).
-    func autoLoadLastModel() async {
-        guard !hasAttemptedAutoLoad else { return }
-        hasAttemptedAutoLoad = true
-        guard let id = UserDefaults.standard.string(forKey: Self.lastLoadedModelKey) else { return }
-        if UserDefaults.standard.bool(forKey: Self.autoLoadInProgressKey) {
-            UserDefaults.standard.set(false, forKey: Self.autoLoadInProgressKey)
-            await logs.write(.warning, event: "model_auto_load_skipped", details: "The previous automatic load did not finish. model=\(id)")
-            return
-        }
-        guard await modelManager.model(id: id) != nil else {
-            UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
-            return
-        }
-        UserDefaults.standard.set(true, forKey: Self.autoLoadInProgressKey)
-        await logs.write(.info, event: "model_auto_load_started", details: "model=\(id)")
-        await loadModel(id)
-        UserDefaults.standard.set(false, forKey: Self.autoLoadInProgressKey)
-    }
-
-    /// Called by the HTTP server when a chat request names an installed model that is not active.
-    func loadModelOnDemand(_ id: String) async -> Bool {
-        guard await modelManager.model(id: id) != nil else { return false }
-        await loadModel(id)
-        return await inference.activeModel().id == id
-    }
-
-    func loadModel(_ id: String) async {
-        guard !modelLoading, !benchmarkRunning else { return }
-        modelLoading = true
-        defer { modelLoading = false }
-        guard !(await inference.hasActiveGeneration()) else {
-            lastError = "Wait for the active inference request to finish before loading a model."
-            return
-        }
-        guard let model = await modelManager.model(id: id) else {
-            lastError = "The selected model is no longer installed."
-            return
-        }
-        do {
-            guard try await modelManager.verifyModel(id: id) else {
-                throw InferenceError.backendUnavailable("The model file is missing or its SHA-256 no longer matches the registry.")
-            }
-            try await inference.loadImportedModel(model, contextTokens: contextTokens, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
-            UserDefaults.standard.set(id, forKey: Self.lastLoadedModelKey)
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
-        }
-        await refresh()
-    }
-
-    func unloadModel() async {
-        guard !modelLoading, !benchmarkRunning else { return }
-        modelLoading = true
-        defer { modelLoading = false }
-        guard !(await inference.hasActiveGeneration()) else {
-            lastError = "Wait for the active inference request to finish before unloading the model."
-            return
-        }
-        do {
-            try await inference.unloadModel()
-            UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
-            await refresh()
-        } catch {
-            lastError = error.localizedDescription
-        }
-    }
-
-    func removeModel(_ id: String) async {
-        guard !modelLoading, !benchmarkRunning else { return }
-        modelLoading = true
-        defer { modelLoading = false }
-        guard !(await inference.hasActiveGeneration()) else {
-            lastError = "Wait for the active inference request to finish before deleting a model."
-            return
-        }
-        do {
-            let active = await inference.activeModel()
-            if active.id == id {
-                try await inference.unloadModel()
-            }
-            try await modelManager.removeModel(id: id)
-            if UserDefaults.standard.string(forKey: Self.lastLoadedModelKey) == id {
-                UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
-            }
-            await logs.write(.info, event: "model_removed", details: "model=\(id)")
-            await refresh()
-        } catch {
-            lastError = "Could not remove model: \(error.localizedDescription)"
-        }
-    }
-
     func clearVisibleError() { lastError = nil }
 
     func reportError(_ message: String) { lastError = message }
@@ -441,5 +318,133 @@ final class AppState: ObservableObject {
         return support.appendingPathComponent("iPhoneLocalAI", isDirectory: true)
             .appendingPathComponent("diagnostics", isDirectory: true)
             .appendingPathComponent("logs.json")
+    }
+}
+
+// MARK: - Model management
+
+@MainActor
+extension AppState {
+    func importModels(from urls: [URL]) async {
+        do {
+            for url in urls { _ = try await modelManager.importModel(from: url) }
+            await logs.write(.info, event: "models_imported", details: "count=\(urls.count)")
+            lastError = nil
+            await refresh()
+        } catch {
+            lastError = "Model import failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Imports `.litertlm` files placed in the app's Documents folder (USB file transfer or Files app).
+    func importModelsFromDocuments() async {
+        guard !modelImporting else { return }
+        modelImporting = true
+        defer { modelImporting = false }
+        do {
+            let imported = try await modelManager.importInbox()
+            if !imported.isEmpty {
+                await logs.write(.info, event: "models_imported_from_documents", details: "count=\(imported.count)")
+                lastError = nil
+            }
+        } catch {
+            lastError = "Model import from Documents failed: \(error.localizedDescription)"
+        }
+        await refresh()
+    }
+
+    /// Reloads the model that was loaded last time, so the API is usable again after a
+    /// restart without touching the phone. Skipped once if the previous auto-load never
+    /// finished (for example the app was killed for memory while loading).
+    func autoLoadLastModel() async {
+        guard !hasAttemptedAutoLoad else { return }
+        hasAttemptedAutoLoad = true
+        guard let id = UserDefaults.standard.string(forKey: Self.lastLoadedModelKey) else { return }
+        if UserDefaults.standard.bool(forKey: Self.autoLoadInProgressKey) {
+            UserDefaults.standard.set(false, forKey: Self.autoLoadInProgressKey)
+            await logs.write(.warning, event: "model_auto_load_skipped", details: "The previous automatic load did not finish. model=\(id)")
+            return
+        }
+        guard await modelManager.model(id: id) != nil else {
+            UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
+            return
+        }
+        UserDefaults.standard.set(true, forKey: Self.autoLoadInProgressKey)
+        await logs.write(.info, event: "model_auto_load_started", details: "model=\(id)")
+        await loadModel(id)
+        UserDefaults.standard.set(false, forKey: Self.autoLoadInProgressKey)
+    }
+
+    /// Called by the HTTP server when a chat request names an installed model that is not active.
+    func loadModelOnDemand(_ id: String) async -> Bool {
+        guard await modelManager.model(id: id) != nil else { return false }
+        await loadModel(id)
+        return await inference.activeModel().id == id
+    }
+
+    func loadModel(_ id: String) async {
+        guard !modelLoading, !benchmarkRunning else { return }
+        modelLoading = true
+        defer { modelLoading = false }
+        guard !(await inference.hasActiveGeneration()) else {
+            lastError = "Wait for the active inference request to finish before loading a model."
+            return
+        }
+        guard let model = await modelManager.model(id: id) else {
+            lastError = "The selected model is no longer installed."
+            return
+        }
+        do {
+            guard try await modelManager.verifyModel(id: id) else {
+                throw InferenceError.backendUnavailable("The model file is missing or its SHA-256 no longer matches the registry.")
+            }
+            try await inference.loadImportedModel(model, contextTokens: contextTokens, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
+            UserDefaults.standard.set(id, forKey: Self.lastLoadedModelKey)
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+        await refresh()
+    }
+
+    func unloadModel() async {
+        guard !modelLoading, !benchmarkRunning else { return }
+        modelLoading = true
+        defer { modelLoading = false }
+        guard !(await inference.hasActiveGeneration()) else {
+            lastError = "Wait for the active inference request to finish before unloading the model."
+            return
+        }
+        do {
+            try await inference.unloadModel()
+            UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
+            await refresh()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func removeModel(_ id: String) async {
+        guard !modelLoading, !benchmarkRunning else { return }
+        modelLoading = true
+        defer { modelLoading = false }
+        guard !(await inference.hasActiveGeneration()) else {
+            lastError = "Wait for the active inference request to finish before deleting a model."
+            return
+        }
+        do {
+            let active = await inference.activeModel()
+            if active.id == id {
+                try await inference.unloadModel()
+            }
+            try await modelManager.removeModel(id: id)
+            if UserDefaults.standard.string(forKey: Self.lastLoadedModelKey) == id {
+                UserDefaults.standard.removeObject(forKey: Self.lastLoadedModelKey)
+            }
+            await logs.write(.info, event: "model_removed", details: "model=\(id)")
+            await refresh()
+        } catch {
+            lastError = "Could not remove model: \(error.localizedDescription)"
+        }
     }
 }

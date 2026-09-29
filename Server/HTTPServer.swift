@@ -196,7 +196,16 @@ final class HTTPServer {
     private let queue = DispatchQueue(label: "jp.localai.iphone-server.http", qos: .userInitiated)
     private var listener: NWListener?
 
-    init(port: UInt16, apiKey: String, allowLAN: Bool, inference: InferenceService, inferenceDefaults: InferenceDefaults = .standard, metrics: MetricsService, logs: LogService, modelLoader: (@Sendable (String) async -> Bool)? = nil) {
+    init(
+        port: UInt16,
+        apiKey: String,
+        allowLAN: Bool,
+        inference: InferenceService,
+        inferenceDefaults: InferenceDefaults = .standard,
+        metrics: MetricsService,
+        logs: LogService,
+        modelLoader: (@Sendable (String) async -> Bool)? = nil
+    ) {
         self.port = port
         self.apiKey = apiKey
         self.allowLAN = allowLAN
