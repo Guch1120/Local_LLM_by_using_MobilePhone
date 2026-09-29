@@ -8,6 +8,7 @@ actor LiteRTGemmaBackend: InferenceBackend {
     private var loadedModel: String?
     private var modelLoadMilliseconds: Double?
     private var selectedBackend = "gpu"
+    private var visionBackend: String?
     private var multiTokenPredictionEnabled = false
 
     func loadModel(configuration: ModelConfiguration) async throws {
@@ -20,53 +21,61 @@ actor LiteRTGemmaBackend: InferenceBackend {
 
         let start = Date()
         ExperimentalFlags.optIntoExperimentalAPIs()
-        ExperimentalFlags.enableSpeculativeDecoding = configuration.multiTokenPredictionEnabled
-        var effectiveMTP = configuration.multiTokenPredictionEnabled
-        do {
-            let gpuConfig = try EngineConfig(
-                modelPath: configuration.fileURL.path,
-                backend: .gpu,
-                // Google's Gallery app pairs the vision executor with the main backend;
-                // a CPU vision executor next to a GPU engine hung image requests on iPhone.
-                visionBackend: .gpu,
-                maxNumTokens: configuration.contextTokens,
-                cacheDir: cacheURL.path
-            )
-            let gpuEngine = Engine(engineConfig: gpuConfig)
-            try await gpuEngine.initialize()
-            engine = gpuEngine
-            selectedBackend = "gpu"
-        } catch {
-            // A GPU initialization failure should not prevent the text API from being used.
-            // iOS third-party Metal availability varies by LiteRT-LM build and device.
-            if effectiveMTP {
-                ExperimentalFlags.enableSpeculativeDecoding = false
-                effectiveMTP = false
-            }
-            let cpuConfig = try EngineConfig(
-                modelPath: configuration.fileURL.path,
-                backend: .cpu(),
-                visionBackend: .cpu(),
-                maxNumTokens: configuration.contextTokens,
-                cacheDir: cacheURL.path
-            )
-            let cpuEngine = Engine(engineConfig: cpuConfig)
+        var lastError: Error?
+        for attempt in Self.attempts() {
+            // MTP is only kept on the GPU path; CPU fallbacks run without it.
+            let mtp = configuration.multiTokenPredictionEnabled && attempt.backend == .gpu
+            ExperimentalFlags.enableSpeculativeDecoding = mtp
             do {
-                try await cpuEngine.initialize()
-                engine = cpuEngine
-                selectedBackend = "cpu"
+                let config = try EngineConfig(
+                    modelPath: configuration.fileURL.path,
+                    backend: attempt.backend,
+                    visionBackend: attempt.vision,
+                    maxNumTokens: configuration.contextTokens,
+                    cacheDir: cacheURL.path
+                )
+                let candidate = Engine(engineConfig: config)
+                try await candidate.initialize()
+                // Some executors only fail when a conversation is created (for example the
+                // GPU vision encoder on iOS: STABLEHLO_COMPOSITE is missing), so probe one.
+                _ = try candidate.createConversation()
+                engine = candidate
+                selectedBackend = attempt.backend.rawValue
+                visionBackend = attempt.vision?.rawValue
+                multiTokenPredictionEnabled = mtp
+                loadedModel = configuration.id
+                modelLoadMilliseconds = Date().timeIntervalSince(start) * 1000
+                return
             } catch {
-                throw InferenceError.backendUnavailable("LiteRT-LM could not initialize this model on GPU or CPU: \(error.localizedDescription)")
+                lastError = error
             }
         }
-        loadedModel = configuration.id
-        multiTokenPredictionEnabled = effectiveMTP
-        modelLoadMilliseconds = Date().timeIntervalSince(start) * 1000
+        ExperimentalFlags.enableSpeculativeDecoding = false
+        let reason = lastError?.localizedDescription ?? "no configuration was attempted"
+        throw InferenceError.backendUnavailable("LiteRT-LM could not initialize this model: \(reason)")
+    }
+
+    /// Engine configurations tried in order until one initializes and can open a conversation.
+    ///
+    /// Image input is only enabled with the GPU vision encoder. The CPU (XNNPACK) vision encoder
+    /// can hang forever on iOS (LiteRT-LM issues #2979 and #2370), which wedges the whole server,
+    /// so it is used only when `LITERT_VISION_BACKEND=cpu` is set for experiments.
+    /// `LITERT_VISION_BACKEND=none` disables image input.
+    private static func attempts() -> [(backend: Backend, vision: Backend?)] {
+        switch ProcessInfo.processInfo.environment["LITERT_VISION_BACKEND"] {
+        case "cpu":
+            return [(.gpu, .cpu()), (.cpu(), .cpu())]
+        case "none":
+            return [(.gpu, nil), (.cpu(), nil)]
+        default:
+            return [(.gpu, .gpu), (.gpu, nil), (.cpu(), nil)]
+        }
     }
 
     func unloadModel() async {
         engine = nil
         loadedModel = nil
+        visionBackend = nil
         modelLoadMilliseconds = nil
         multiTokenPredictionEnabled = false
     }
@@ -114,7 +123,8 @@ actor LiteRTGemmaBackend: InferenceBackend {
     }
 
     func capabilities() async -> BackendCapabilities {
-        BackendCapabilities(text: true, image: true, audio: false, streaming: true)
+        // Before a model is loaded, report what the default configuration aims for.
+        BackendCapabilities(text: true, image: loadedModel == nil || visionBackend != nil, audio: false, streaming: true)
     }
 
     func metrics() async -> BackendMetrics {

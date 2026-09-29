@@ -30,6 +30,7 @@ The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, 
 - `POST /v1/chat/completions` accepts string content or an array containing text and `image_url` data URLs. If `model` names an installed model that is not active, the server loads it before generating (the request waits for the load); unknown models return `model_not_found`.
 - The last successfully loaded model is loaded again automatically when the app starts. If the app was terminated during that automatic load, the next launch skips it once.
 - Image payloads are limited to JPEG/PNG and 12 MiB before normalization to a 2048-pixel maximum edge JPEG.
+- Image input with LiteRT-LM on iOS depends on the GPU vision encoder. At load time the backend tries GPU text + GPU vision, then GPU text without vision, then CPU text without vision, and keeps the first configuration that can open a conversation; `/capabilities` reports whether images are enabled. The CPU vision encoder is not used by default because it can hang indefinitely on iOS (LiteRT-LM issues #2979, #2370); launch with `LITERT_VISION_BACKEND=cpu` (or `none`) to override.
 - Model context length and Multi-Token Prediction are configurable; MTP is reported from the active LiteRT backend.
 - Logs omit prompt and image contents.
 - The current mock backend is named `mock-echo`; compatible `.litertlm` files can be loaded through LiteRT-LM, but model/device execution remains unverified.
