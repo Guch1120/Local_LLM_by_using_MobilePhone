@@ -24,6 +24,7 @@ Build a foreground iOS app that runs local text and image inference and exposes 
 - Lint: `swiftlint lint --quiet`
 - Linux development cannot run Xcode or validate iOS frameworks; rely on the macOS GitHub Actions workflow until a Mac runner is available.
 - Run lint, build, and tests before committing when macOS CI is available. Do not mark them as passing unless the command or GitHub Actions run completed successfully.
+- macOS runner minutes are limited and billed at about 10x Linux minutes (the repository is private). Avoid needless pushes of app sources (each triggers a dev build), batch related changes into one push, and start `pull-request.yml` or `testflight.yml` manually only when needed.
 - Do not claim device, USB, LiteRT, or TestFlight verification until it has actually run.
 
 ## Physical iPhone verification (USB)

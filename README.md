@@ -60,7 +60,7 @@ The bundle includes the app version, build number, Git revision, iOS version, se
 
 For a smaller live view, use `GET /health`, `GET /metrics`, or `GET /logs`. All except `/health` require the bearer token. The Settings screen shows the API key; rotate it there if it is exposed.
 
-GitHub Actions attaches the source revision to each built app, so a diagnostics bundle identifies the exact commit running on the phone. Pushes to `iphone` or `main` run the unsigned Simulator build workflow. After Apple Developer Program approval and a TestFlight install, the same USB-forwarded endpoints can be used to report app behavior from Ubuntu without Xcode. This remote path provides application logs and health/performance state; LLDB breakpoints, view hierarchy inspection, Metal debugging, and Instruments still require a Mac.
+GitHub Actions attaches the source revision to each built app, so a diagnostics bundle identifies the exact commit running on the phone. Pull requests run SwiftLint on Linux and the Simulator build/tests on macOS; the workflow can also be started manually. Pushes to `iphone` that change app sources build a development-signed IPA. After Apple Developer Program approval and a TestFlight install, the same USB-forwarded endpoints can be used to report app behavior from Ubuntu without Xcode. This remote path provides application logs and health/performance state; LLDB breakpoints, view hierarchy inspection, Metal debugging, and Instruments still require a Mac.
 
 The OpenAI Python client can use the active model ID returned by `/v1/models`:
 
@@ -158,7 +158,13 @@ curl \
 
 ### 開発ビルドを USB で直接インストールする
 
-開発中はTestFlightを経由せず、`iOS dev build` ワークフロー(`.github/workflows/dev-build.yml`)が作る開発署名の IPA を USB で直接インストールします。`iphone` ブランチへの push(Markdown と `scripts/iphone/` のみの変更は除く)で自動実行され、手動実行もできます。
+開発中はTestFlightを経由せず、`iOS dev build` ワークフロー(`.github/workflows/dev-build.yml`)が作る開発署名の IPA を USB で直接インストールします。`iphone` ブランチへの push のうち、アプリに含まれるファイル(`App/` `Core/` `Backends/` `Server/` `Assets.xcassets/` プロジェクト設定など)が変わったときだけ自動実行され、手動実行もできます。
+
+GitHub Actions の macOS ランナーは Linux の約10倍の速さで無料枠の分数を消費し、private リポジトリでは利用枠を超えるとジョブが開始されなくなります。そのため、単体テスト(`iOS pull request`)は PR 作成時と手動実行時のみ走ります。TestFlight に出す前などは次で手動実行してください。
+
+```bash
+gh workflow run pull-request.yml --ref iphone
+```
 
 ```bash
 git push origin iphone

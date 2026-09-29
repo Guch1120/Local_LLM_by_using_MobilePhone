@@ -1,35 +1,40 @@
 name: iOS pull request
 
+# macOS runner minutes are billed at a much higher rate than Linux minutes, so
+# this workflow runs only for pull requests (or on demand), lints on Linux
+# first, and runs the Simulator build and tests in a single macOS step.
+
 on:
   pull_request:
-  push:
-    branches: [main, iphone]
+    paths-ignore: ['**.md', 'scripts/iphone/**', 'test.png']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container: ghcr.io/realm/swiftlint:0.65.1
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Lint Swift sources
+        run: swiftlint lint --quiet
+
+  test:
+    needs: lint
     runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Skip LiteRT-LM Git LFS smudging
         run: git lfs install --skip-smudge
-      - name: Resolve Swift packages
-        run: xcodebuild -resolvePackageDependencies -project iPhoneLocalAI.xcodeproj -scheme iPhoneLocalAI
-      - name: Install SwiftLint
-        run: brew install swiftlint
-      - name: Lint Swift sources
-        run: swiftlint lint --quiet
-      - name: Build iOS Simulator app
-        run: >-
-          xcodebuild -project iPhoneLocalAI.xcodeproj
-          -scheme iPhoneLocalAI
-          -destination 'generic/platform=iOS Simulator'
-          GIT_COMMIT_SHA="$GITHUB_SHA"
-          EXCLUDED_ARCHS=x86_64
-          CODE_SIGNING_ALLOWED=NO build
-      - name: Run unit tests
+      - name: Build and run unit tests on iOS Simulator
         run: >-
           xcodebuild -project iPhoneLocalAI.xcodeproj
           -scheme iPhoneLocalAI

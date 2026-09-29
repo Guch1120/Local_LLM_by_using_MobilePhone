@@ -2,11 +2,22 @@ name: iOS dev build
 
 # Development-signed IPA for direct USB install on registered devices.
 # Install on Ubuntu with: bash scripts/iphone/install_dev_build.sh
+# Runs only when files that end up in the app change, to save macOS minutes.
+# Unit tests run in the pull request workflow, not here.
 
 on:
   push:
     branches: [iphone]
-    paths-ignore: ['**.md', 'scripts/iphone/**', 'test.png']
+    paths:
+      - 'App/**'
+      - 'Core/**'
+      - 'Backends/**'
+      - 'Server/**'
+      - 'Assets.xcassets/**'
+      - 'PrivacyInfo.xcprivacy'
+      - 'iPhoneLocalAI.xcodeproj/**'
+      - '.github/workflows/dev-build.yml'
+      - 'scripts/ci/register_devices.py'
   workflow_dispatch:
 
 permissions:
@@ -19,6 +30,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-26
+    timeout-minutes: 30
     env:
       APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
       APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}

@@ -6,9 +6,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
 jobs:
   upload:
     runs-on: macos-26
+    timeout-minutes: 45
     env:
       APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
       APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
