@@ -26,6 +26,17 @@ Build a foreground iOS app that runs local text and image inference and exposes 
 - Run lint, build, and tests before committing when macOS CI is available. Do not mark them as passing unless the command or GitHub Actions run completed successfully.
 - Do not claim device, USB, LiteRT, or TestFlight verification until it has actually run.
 
+## Physical iPhone verification (USB)
+
+Use these helpers for device checks from Ubuntu:
+
+- Connection check: `bash scripts/iphone/check.sh`
+- Screenshot: `bash scripts/iphone/screenshot.sh` (latest image: `artifacts/iphone/latest.png`)
+- iPhone logs: `bash scripts/iphone/syslog.sh`
+- HTTP API: run `bash scripts/iphone/proxy.sh` in a separate terminal (`127.0.0.1:8080 -> iPhone:8080`)
+- API key: `source scripts/iphone/get_api_key.sh` (reads the key copied in the app into `API_KEY`; never print it)
+- Install app changes: push to `iphone`, then `bash scripts/iphone/install_dev_build.sh --wait` installs the development-signed IPA from the `iOS dev build` workflow over USB. Use the manual TestFlight workflow only for distribution builds.
+
 ## Dependency policy
 
 Prefer Apple frameworks and Google's official LiteRT-LM distribution. Before adding a dependency, verify its license, source availability, maintenance status, and security impact from primary sources. Do not add model binaries to Git or the app target.

@@ -89,6 +89,7 @@ scripts/iphone/
   syslog.sh       # iPhoneのsystem logを取得
   proxy.sh        # USB経由でPC側ポートをiPhoneへ転送
   get_api_key.sh  # iPhoneのクリップボードからAPIキーを読み込む
+  install_dev_build.sh  # CIの開発ビルドをUSBでインストールして起動
 ```
 
 初回セットアップ手順は [IPHONE_USB_SETUP.md](IPHONE_USB_SETUP.md) を参照してください。Developer Mode の有効化と DeveloperDiskImage のマウントまで完了していれば、通常は次のコマンドで接続状態を確認できます。
@@ -153,6 +154,21 @@ curl \
 現在のシェルに変数を残すため、`get_api_key.sh` は `bash scripts/iphone/get_api_key.sh` ではなく必ず `source scripts/iphone/get_api_key.sh` で実行してください。
 
 取得したスクリーンショットやログは `artifacts/iphone/` 以下に保存され、このディレクトリは Git 管理対象外です。
+
+### 開発ビルドを USB で直接インストールする
+
+開発中はTestFlightを経由せず、`iOS dev build` ワークフロー(`.github/workflows/dev-build.yml`)が作る開発署名の IPA を USB で直接インストールします。`iphone` ブランチへの push(Markdown と `scripts/iphone/` のみの変更は除く)で自動実行され、手動実行もできます。
+
+```bash
+git push origin iphone
+bash scripts/iphone/install_dev_build.sh --wait   # 最新runの完了を待ってインストール・起動
+bash scripts/iphone/install_dev_build.sh          # 成功済みの最新runをインストール
+bash scripts/iphone/install_dev_build.sh RUN_ID   # 指定runをインストール
+```
+
+IPA は `artifacts/iphone/builds/<run id>/` に保存されます。開発署名のアプリは Apple Developer アカウントに登録済みの端末にしかインストールできません。端末は repository variable `DEV_DEVICE_UDIDS` に `名前=UDID` をカンマ区切りで記載すると、ワークフローが App Store Connect API で自動登録します(名前に空白は使えません)。UDID は `idevice_id -l` で取得できます。
+
+TestFlight(`TestFlight` ワークフロー、手動実行)は、開発ビルドで確認できた変更を配布・共有するときに使います。
 
 ## GitHub Actions secrets
 
