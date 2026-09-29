@@ -79,20 +79,16 @@ The mock backend returns deterministic text and does not load imported model fil
 
 ## GitHub Actions secrets
 
-The TestFlight workflow is manual. Before running it, configure these repository secrets:
+The TestFlight workflow is manual and uses Xcode automatic signing with Apple's cloud-managed distribution certificates. Before running it, configure these repository secrets:
 
 ```text
 APPSTORE_ISSUER_ID
 APPSTORE_API_KEY_ID
 APPSTORE_API_PRIVATE_KEY
 APPLE_TEAM_ID
-IOS_DISTRIBUTION_CERTIFICATE_P12    # base64-encoded .p12
-IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
-IOS_PROVISIONING_PROFILE_BASE64     # base64-encoded .mobileprovision
-KEYCHAIN_PASSWORD
 ```
 
-The provisioning profile must use bundle identifier `jp.localai.iphone-server`. App Store Connect must contain an app record for that bundle ID. No signing data is stored in the repository.
+App Store Connect must contain an app record for bundle identifier `jp.localai.iphone-server`. The workflow passes the App Store Connect API key directly to `xcodebuild`; no distribution `.p12` or manually managed provisioning profile is stored in the repository or required as a GitHub secret.
 
 ## Project notes
 
