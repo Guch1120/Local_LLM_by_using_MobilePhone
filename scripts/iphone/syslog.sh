@@ -13,29 +13,27 @@ if ! idevice_id -l 2>/dev/null | grep -q .; then
   exit 1
 fi
 
-repo_root="$(cd "$(dirname "\${BASH_SOURCE[0]}")/../.." && pwd)"
-out_dir="\${repo_root}/artifacts/iphone/logs"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+out_dir="${repo_root}/artifacts/iphone/logs"
 mkdir -p "$out_dir"
 
 timestamp="$(date '+%Y%m%d-%H%M%S')"
-output="\${out_dir}/syslog-\${timestamp}.log"
-filter="\${1:-}"
+output="${out_dir}/syslog-${timestamp}.log"
+filter="${1:-}"
 
 echo "[INFO] Streaming iPhone syslog. Stop with Ctrl-C."
 echo "[INFO] Saving to: $output"
 
+set +e
 if [ -n "$filter" ]; then
   echo "[INFO] Filter: $filter"
-  set +e
   idevicesyslog 2>&1 | grep --line-buffered -i -- "$filter" | tee -a "$output"
-  status=\${PIPESTATUS[0]}
-  set -e
+  status=${PIPESTATUS[0]}
 else
-  set +e
   idevicesyslog 2>&1 | tee -a "$output"
-  status=\${PIPESTATUS[0]}
-  set -e
+  status=${PIPESTATUS[0]}
 fi
+set -e
 
 if [ "$status" -ne 0 ] && [ "$status" -ne 130 ]; then
   exit "$status"
