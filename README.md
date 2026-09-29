@@ -15,7 +15,7 @@ An iOS app that exposes a local, OpenAI-compatible inference API so a nearby PC 
 - A privacy manifest for app-local UserDefaults and model-file metadata access; no app tracking or collected data is declared.
 - CI workflows for unsigned iOS Simulator builds on pull requests and signed TestFlight uploads when repository secrets are configured.
 
-The app starts with the mock backend. LiteRT-LM is isolated behind `InferenceBackend` and pinned to Google's official Swift package v0.17.1. The adapter attempts Metal first and falls back to CPU if engine initialization fails. Google's Swift API is currently an early preview, so successful loading, image inference, and GPU acceleration still need confirmation on the iPhone. The package is distributed under Apache-2.0.
+The app starts with the mock backend. LiteRT-LM is isolated behind `InferenceBackend` and pinned to Google's official Swift package v0.17.1. The adapter attempts Metal first and falls back to CPU if engine initialization fails. Text inference with Gemma 4 E2B on the Metal GPU backend has been verified on an iPhone 16 Pro Max. Image input is disabled for now because LiteRT-LM 0.17.1's vision encoder does not run on iOS (see SPEC.md). The package is distributed under Apache-2.0.
 
 ## Build
 
@@ -75,7 +75,7 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-The mock backend returns deterministic text and does not load imported model files. Imported `.litertlm` files can be selected for the LiteRT backend. Physical-device model inference, LiteRT GPU operation, USB forwarding, and TestFlight upload still need verification.
+The mock backend returns deterministic text and does not load imported model files. Imported `.litertlm` files can be selected for the LiteRT backend. Physical-device text inference on the GPU, USB forwarding, and TestFlight upload have been verified; image input is not yet available on iOS.
 
 
 ## Ubuntu から iPhone 実機を確認する

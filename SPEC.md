@@ -22,7 +22,7 @@ Camera capture, microphone/audio, speech recognition, TTS, embeddings, RAG, ROS,
 
 ## Current stage
 
-The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, `.litertlm` model import/verification, generation defaults, diagnostics, benchmark actions, and unit/integration tests are implemented. LiteRT-LM 0.17.1 is connected behind the backend protocol with Metal-first initialization and CPU fallback. The app and tests are developed primarily from Ubuntu and validated with the macOS GitHub Actions workflows because the local development environment has no Xcode toolchain. Device inference, GPU operation, USB forwarding, signing, and TestFlight upload still need physical-device verification. The Apple Developer Program membership is active, and the explicit App ID `jp.localai.iphone-server` has been registered. TestFlight distribution now depends on completing the App Store Connect record, signing assets, API-key setup, and repository secrets described in `TESTFLIGHT_SETUP.md`.
+The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, `.litertlm` model import/verification, generation defaults, diagnostics, benchmark actions, and unit/integration tests are implemented. LiteRT-LM 0.17.1 is connected behind the backend protocol with Metal-first initialization and CPU fallback. The app and tests are developed primarily from Ubuntu and validated with the macOS GitHub Actions workflows because the local development environment has no Xcode toolchain. Verified on an iPhone 16 Pro Max (iOS 26.4.2) on 2026-09-30: TestFlight upload and install, development-signed IPA install over USB, USB model transfer and SHA-256 registration, Gemma 4 E2B (`gemma-4-E2B-it.litertlm`) text inference on the Metal GPU backend (non-streaming, streaming, multi-turn, Japanese), automatic reload after restart, and access from Ubuntu with the OpenAI Python SDK through `iproxy`. Image input is not available yet: with LiteRT-LM 0.17.1 the GPU vision encoder fails on iOS (`STABLEHLO_COMPOSITE failed to prepare`) and the CPU vision encoder hung the request, matching upstream issues #2979 and #2370; the app therefore reports `image: false` and rejects image requests with `unsupported_modality`.
 
 ## API behavior
 
@@ -33,7 +33,7 @@ The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, 
 - Image input with LiteRT-LM on iOS depends on the GPU vision encoder. At load time the backend tries GPU text + GPU vision, then GPU text without vision, then CPU text without vision, and keeps the first configuration that can open a conversation; `/capabilities` reports whether images are enabled. The CPU vision encoder is not used by default because it can hang indefinitely on iOS (LiteRT-LM issues #2979, #2370); launch with `LITERT_VISION_BACKEND=cpu` (or `none`) to override.
 - Model context length and Multi-Token Prediction are configurable; MTP is reported from the active LiteRT backend.
 - Logs omit prompt and image contents.
-- The current mock backend is named `mock-echo`; compatible `.litertlm` files can be loaded through LiteRT-LM, but model/device execution remains unverified.
+- The current mock backend is named `mock-echo`; compatible `.litertlm` files are loaded through LiteRT-LM (text inference verified on device; image input see Current stage).
 
 ## Staged implementation
 
