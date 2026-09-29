@@ -211,3 +211,7 @@ App Store Connect must contain an app record for bundle identifier `jp.localai.i
 - See [IPHONE_USB_SETUP.md](IPHONE_USB_SETUP.md) for Ubuntu USB pairing, Developer Mode, screenshot capture, syslog, and port forwarding setup.
 - See [AGENTS.md](AGENTS.md) for repository rules and build commands.
 - Never commit App Store Connect credentials, signing certificates, API keys, or model files.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE). Model weights are not part of this repository and are subject to their own licenses.
