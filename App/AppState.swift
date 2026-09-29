@@ -378,7 +378,14 @@ extension AppState {
     /// Called by the HTTP server when a chat request names an installed model that is not active.
     func loadModelOnDemand(_ id: String) async -> Bool {
         guard await modelManager.model(id: id) != nil else { return false }
-        await loadModel(id)
+        // A load already in progress (for example the automatic load at launch) makes
+        // loadModel return immediately, so wait for it before deciding. Give up after 5 minutes.
+        for _ in 0..<1500 where modelLoading {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        if await inference.activeModel().id != id {
+            await loadModel(id)
+        }
         return await inference.activeModel().id == id
     }
 
