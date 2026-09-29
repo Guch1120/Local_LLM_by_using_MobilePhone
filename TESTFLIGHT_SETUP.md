@@ -130,7 +130,7 @@ Internal TestFlight distribution does not publish the app on the public App Stor
 
 ### Authentication or cloud-signing authorization failure
 
-Verify all three App Store Connect API values and the exact private-key contents. The API key must have sufficient App Store Connect permissions for distribution. Account Holders and Admins can cloud-sign for App Store Connect distribution by default; other roles may require the relevant cloud-managed distribution certificate permission.
+Verify all three App Store Connect API values and the exact private-key contents. For GitHub Actions cloud signing, use a Team API key with the **Admin** role. The previous App Manager key is sufficient for many App Store Connect operations, but Xcode cloud signing can fail with `Cloud signing permission error` because API keys do not receive the per-user cloud-managed distribution certificate grant. If this error occurs, create a new Admin Team API key and replace `APPSTORE_API_KEY_ID` and `APPSTORE_API_PRIVATE_KEY` (the Issuer ID stays the same).
 
 ### Automatic provisioning failure
 
