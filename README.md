@@ -173,7 +173,9 @@ bash scripts/iphone/install_dev_build.sh          # 成功済みの最新runを�
 bash scripts/iphone/install_dev_build.sh RUN_ID   # 指定runをインストール
 ```
 
-IPA は `artifacts/iphone/builds/<run id>/` に保存されます。開発署名のアプリは Apple Developer アカウントに登録済みの端末にしかインストールできません。端末は repository variable `DEV_DEVICE_UDIDS` に `名前=UDID` をカンマ区切りで記載すると、ワークフローが App Store Connect API で自動登録します(名前に空白は使えません)。UDID は `idevice_id -l` で取得できます。
+IPA は `artifacts/iphone/builds/<run id>/` に保存されます。開発署名のアプリは Apple Developer アカウントに登録済みの端末にしかインストールできません。端末は repository secret `DEV_DEVICE_UDIDS` に `名前=UDID` をカンマ区切りで記載すると、ワークフローが App Store Connect API で自動登録します(名前に空白は使えません)。UDID は `idevice_id -l` で取得できます。
+
+公開リポジトリの Actions 成果物は誰でもダウンロードできるため、IPA は repository secret `DEV_IPA_PASSWORD` で暗号化してアップロードされます。インストールする PC には同じパスワードを `~/.config/iphone-local-ai/dev-ipa-password`(パーミッション 600)に置くか、環境変数 `DEV_IPA_PASSWORD` で渡してください。
 
 ### モデルを USB で転送する
 
@@ -196,6 +198,8 @@ APPSTORE_ISSUER_ID
 APPSTORE_API_KEY_ID
 APPSTORE_API_PRIVATE_KEY
 APPLE_TEAM_ID
+DEV_DEVICE_UDIDS   # development builds only: NAME=UDID, comma-separated
+DEV_IPA_PASSWORD   # development builds only: encrypts the IPA artifact
 ```
 
 App Store Connect must contain an app record for bundle identifier `jp.localai.iphone-server`. The workflow passes the App Store Connect API key directly to `xcodebuild`; no distribution `.p12` or manually managed provisioning profile is stored in the repository or required as a GitHub secret.

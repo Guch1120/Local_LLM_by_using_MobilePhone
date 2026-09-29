@@ -36,7 +36,9 @@ jobs:
       APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
       APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      DEV_DEVICE_UDIDS: ${{ vars.DEV_DEVICE_UDIDS }}
+      # Secrets (not variables) so UDIDs stay masked in public workflow logs.
+      DEV_DEVICE_UDIDS: ${{ secrets.DEV_DEVICE_UDIDS }}
+      DEV_IPA_PASSWORD: ${{ secrets.DEV_IPA_PASSWORD }}
     steps:
       - uses: actions/checkout@v7.0.1
 
@@ -50,7 +52,8 @@ jobs:
           : "${APPSTORE_API_KEY_ID:?Add the APPSTORE_API_KEY_ID repository secret}"
           : "${APPSTORE_API_PRIVATE_KEY:?Add the APPSTORE_API_PRIVATE_KEY repository secret}"
           : "${APPLE_TEAM_ID:?Add the APPLE_TEAM_ID repository secret}"
-          : "${DEV_DEVICE_UDIDS:?Add the DEV_DEVICE_UDIDS repository variable}"
+          : "${DEV_DEVICE_UDIDS:?Add the DEV_DEVICE_UDIDS repository secret}"
+          : "${DEV_IPA_PASSWORD:?Add the DEV_IPA_PASSWORD repository secret}"
 
       - name: Install App Store Connect API key
         run: |
@@ -114,14 +117,25 @@ jobs:
 
           ls -la "$RUNNER_TEMP/export"
 
-      - name: Upload IPA artifact
+      # Artifacts of a public repository can be downloaded by any GitHub user, and the
+      # IPA embeds the provisioning profile (team and device UDIDs). Upload it encrypted.
+      - name: Encrypt IPA
+        run: |
+          set -euo pipefail
+          "$(brew --prefix openssl@3)/bin/openssl" enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -in "$RUNNER_TEMP/export/iPhoneLocalAI.ipa" \
+            -out "$RUNNER_TEMP/iPhoneLocalAI.ipa.enc" \
+            -pass env:DEV_IPA_PASSWORD
+          rm -rf "$RUNNER_TEMP/export"
+
+      - name: Upload encrypted IPA artifact
         uses: actions/upload-artifact@v7.0.1
         with:
           name: iPhoneLocalAI-dev-${{ github.run_number }}
-          path: ${{ runner.temp }}/export/*.ipa
+          path: ${{ runner.temp }}/iPhoneLocalAI.ipa.enc
           if-no-files-found: error
           retention-days: 7
 
       - name: Remove API key
         if: always()
-        run: rm -f "$RUNNER_TEMP"/AuthKey_*.p8
+        run: rm -rf "$RUNNER_TEMP"/AuthKey_*.p8 "$RUNNER_TEMP/export" "$RUNNER_TEMP/iPhoneLocalAI.ipa.enc"

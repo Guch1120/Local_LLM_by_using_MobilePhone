@@ -87,7 +87,7 @@ def parse_devices(raw: str):
 def main() -> int:
     devices = parse_devices(os.environ.get("DEV_DEVICE_UDIDS", ""))
     if not devices:
-        print("DEV_DEVICE_UDIDS is empty; set the DEV_DEVICE_UDIDS repository variable.", file=sys.stderr)
+        print("DEV_DEVICE_UDIDS is empty; set the DEV_DEVICE_UDIDS repository secret.", file=sys.stderr)
         return 1
 
     token = make_token(
