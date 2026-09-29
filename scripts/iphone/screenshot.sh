@@ -12,13 +12,13 @@ if ! pymobiledevice3 usbmux list 2>/dev/null | grep -q '"DeviceClass": "iPhone"'
   exit 1
 fi
 
-repo_root="$(cd "$(dirname "\${BASH_SOURCE[0]}")/../.." && pwd)"
-out_dir="\${repo_root}/artifacts/iphone/screenshots"
-latest="\${repo_root}/artifacts/iphone/latest.png"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+out_dir="${repo_root}/artifacts/iphone/screenshots"
+latest="${repo_root}/artifacts/iphone/latest.png"
 mkdir -p "$out_dir"
 
 timestamp="$(date '+%Y%m%d-%H%M%S')"
-output="\${1:-\${out_dir}/iphone-\${timestamp}.png}"
+output="${1:-${out_dir}/iphone-${timestamp}.png}"
 mkdir -p "$(dirname "$output")"
 
 echo "[INFO] Ensuring DeveloperDiskImage is mounted..."
