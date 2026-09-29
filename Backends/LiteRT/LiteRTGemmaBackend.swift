@@ -38,7 +38,7 @@ actor LiteRTGemmaBackend: InferenceBackend {
                 try await candidate.initialize()
                 // Some executors only fail when a conversation is created (for example the
                 // GPU vision encoder on iOS: STABLEHLO_COMPOSITE is missing), so probe one.
-                _ = try candidate.createConversation()
+                _ = try await candidate.createConversation()
                 engine = candidate
                 selectedBackend = attempt.backend.rawValue
                 visionBackend = attempt.vision?.rawValue
