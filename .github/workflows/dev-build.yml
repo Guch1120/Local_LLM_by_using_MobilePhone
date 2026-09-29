@@ -1,7 +1,7 @@
 name: iOS dev build
 
 # Development-signed IPA for direct USB install on registered devices.
-# Install on Ubuntu with: bash scripts/iphone/install_dev_build.sh
+# Install on Ubuntu with: bash scripts/iphone/install_dev_build.sh --wait
 # Runs only when files that end up in the app change, to save macOS minutes.
 # Unit tests run in the pull request workflow, not here.
 
