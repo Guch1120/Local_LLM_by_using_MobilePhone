@@ -101,8 +101,10 @@ private final class HTTPConnectionSession: HTTPResponseSink {
     }
 
     private func receiveNext() {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
-            guard let self else { return }
+        // Keep the session alive while NWConnection is waiting for bytes. The server
+        // does not otherwise retain this per-connection object after its accept
+        // callback returns.
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [self] data, _, isComplete, error in
             if let error {
                 self.connection.cancel()
                 _ = error
