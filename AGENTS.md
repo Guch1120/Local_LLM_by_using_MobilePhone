@@ -35,6 +35,7 @@ Use these helpers for device checks from Ubuntu:
 - iPhone logs: `bash scripts/iphone/syslog.sh`
 - HTTP API: run `bash scripts/iphone/proxy.sh` in a separate terminal (`127.0.0.1:8080 -> iPhone:8080`)
 - API key: `source scripts/iphone/get_api_key.sh` (reads the key copied in the app into `API_KEY`; never print it)
+- Model transfer: `bash scripts/iphone/push_model.sh PATH/TO/model.litertlm` uploads into the app's Documents folder; the app moves it into Application Support on launch. Keep model files outside the repository.
 - Install app changes: push to `iphone`, then `bash scripts/iphone/install_dev_build.sh --wait` installs the development-signed IPA from the `iOS dev build` workflow over USB. Use the manual TestFlight workflow only for distribution builds.
 
 ## Dependency policy

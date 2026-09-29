@@ -90,6 +90,7 @@ scripts/iphone/
   proxy.sh        # USB経由でPC側ポートをiPhoneへ転送
   get_api_key.sh  # iPhoneのクリップボードからAPIキーを読み込む
   install_dev_build.sh  # CIの開発ビルドをUSBでインストールして起動
+  push_model.sh   # .litertlmモデルをUSBでアプリへ転送して取り込む
 ```
 
 初回セットアップ手順は [IPHONE_USB_SETUP.md](IPHONE_USB_SETUP.md) を参照してください。Developer Mode の有効化と DeveloperDiskImage のマウントまで完了していれば、通常は次のコマンドで接続状態を確認できます。
@@ -167,6 +168,16 @@ bash scripts/iphone/install_dev_build.sh RUN_ID   # 指定runをインストー�
 ```
 
 IPA は `artifacts/iphone/builds/<run id>/` に保存されます。開発署名のアプリは Apple Developer アカウントに登録済みの端末にしかインストールできません。端末は repository variable `DEV_DEVICE_UDIDS` に `名前=UDID` をカンマ区切りで記載すると、ワークフローが App Store Connect API で自動登録します(名前に空白は使えません)。UDID は `idevice_id -l` で取得できます。
+
+### モデルを USB で転送する
+
+`.litertlm` モデルはアプリに同梱せず、USB でアプリの Documents フォルダへ転送します。アプリは起動時(またはモデル画面の「Import from Documents folder」)に Documents 内の `.litertlm` を Application Support へ移動し、SHA-256 を記録して登録します。
+
+```bash
+bash scripts/iphone/push_model.sh ~/models/gemma-4-E2B-it.litertlm
+```
+
+転送中は `.part` という名前で送り、完了後に名前を変えるので、転送途中のファイルが取り込まれることはありません。登録後、モデル画面で「Load」を押すと読み込まれます。iOS 向けには Hugging Face `litert-community` の汎用版(`gemma-4-E2B-it.litertlm` など)を使います。Documents フォルダは「ファイル」アプリからも見えるため、PC を使わずにモデルを置くこともできます。
 
 TestFlight(`TestFlight` ワークフロー、手動実行)は、開発ビルドで確認できた変更を配布・共有するときに使います。
 

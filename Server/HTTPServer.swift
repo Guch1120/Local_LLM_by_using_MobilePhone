@@ -283,7 +283,7 @@ final class HTTPServer {
                 "backend": active.backend,
                 "model": jsonValue(active.id),
                 "modalities": ["text": backend.text, "image": backend.image, "audio": backend.audio, "camera": false],
-                "features": ["streaming": backend.streaming, "tools": false, "usb_forwarding": false, "mtp": backendMetrics.multiTokenPredictionEnabled]
+                "features": ["streaming": backend.streaming, "tools": false, "usb_forwarding": true, "mtp": backendMetrics.multiTokenPredictionEnabled]
             ]
             await session.sendJSON(response, status: 200)
         case ("GET", "/metrics"):

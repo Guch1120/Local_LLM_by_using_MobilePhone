@@ -9,6 +9,13 @@ struct ModelManagerView: View {
         NavigationStack {
             List {
                 Section {
+                    if appState.modelImporting {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("Importing model files from Documents.")
+                                .font(.footnote)
+                        }
+                    }
                     if appState.modelLoading {
                         HStack(spacing: 10) {
                             ProgressView()
@@ -51,7 +58,14 @@ struct ModelManagerView: View {
                         Label("Import model file", systemImage: "square.and.arrow.down")
                     }
                     .disabled(appState.modelLoading)
+                    Button { Task { await appState.importModelsFromDocuments() } } label: {
+                        Label("Import from Documents folder", systemImage: "folder")
+                    }
+                    .disabled(appState.modelLoading || appState.modelImporting)
                     Text("Files are copied to Application Support and hashed locally. Model downloads are not performed by this app.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text(".litertlm files placed in this app's Documents folder (Files app or USB) are moved in automatically when the app opens.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

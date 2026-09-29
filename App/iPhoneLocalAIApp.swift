@@ -13,6 +13,7 @@ struct IPhoneLocalAIApp: App {
                     await appState.applicationBecameActive()
                     await appState.startServer()
                     await appState.refresh()
+                    await appState.importModelsFromDocuments()
                     while !Task.isCancelled {
                         try? await Task.sleep(for: .seconds(3))
                         await appState.refresh()
@@ -23,6 +24,7 @@ struct IPhoneLocalAIApp: App {
                         if phase == .active {
                             await appState.applicationBecameActive()
                             await appState.startServer()
+                            await appState.importModelsFromDocuments()
                         } else if phase == .inactive {
                             await appState.applicationBecameInactive()
                         } else if phase == .background {

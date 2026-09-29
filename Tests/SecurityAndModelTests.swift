@@ -51,6 +51,49 @@ final class SecurityAndModelTests: XCTestCase {
         XCTAssertFalse(stillValid)
     }
 
+    func testInboxImportMovesModelsAndSkipsOtherFiles() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let inbox = root.appendingPathComponent("Documents", isDirectory: true)
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = inbox.appendingPathComponent("inbox-model.litertlm")
+        try Data("inbox model".utf8).write(to: source)
+        try Data("notes".utf8).write(to: inbox.appendingPathComponent("notes.txt"))
+        let manager = ModelManager(directoryURL: root.appendingPathComponent("Models", isDirectory: true), inboxURL: inbox)
+
+        let imported = try await manager.importInbox()
+        XCTAssertEqual(imported.map(\.id), ["inbox-model"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: imported[0].path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: inbox.appendingPathComponent("notes.txt").path))
+        let second = try await manager.importInbox()
+        XCTAssertTrue(second.isEmpty)
+    }
+
+    func testRegistryResolvesModelsAfterContainerPathChanges() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let modelDirectory = root.appendingPathComponent("Models", isDirectory: true)
+        try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data("weights".utf8).write(to: modelDirectory.appendingPathComponent("moved.litertlm"))
+        let stale = InstalledModel(
+            id: "moved",
+            name: "moved",
+            backend: "litert-lm",
+            path: "/private/var/mobile/Containers/Data/Application/OLD-UUID/Library/Application Support/Models/moved.litertlm",
+            sha256: "0",
+            sizeBytes: 7,
+            modalities: ["text"],
+            importedAt: Date()
+        )
+        try JSONEncoder().encode([stale]).write(to: modelDirectory.appendingPathComponent("models.json"))
+
+        let manager = ModelManager(directoryURL: modelDirectory)
+        let models = await manager.list()
+        XCTAssertEqual(models.map(\.id), ["moved"])
+        XCTAssertEqual(models.first?.path, modelDirectory.appendingPathComponent("moved.litertlm").path)
+    }
+
     func testModelImportRejectsNonLiteRTFile() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

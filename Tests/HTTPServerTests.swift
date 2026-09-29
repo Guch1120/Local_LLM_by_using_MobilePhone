@@ -22,6 +22,8 @@ final class HTTPServerTests: XCTestCase {
         XCTAssertEqual(capabilities.status, 200)
         let capabilitiesBody = try XCTUnwrap(capabilities.jsonBody as? [String: Any])
         XCTAssertEqual(capabilitiesBody["server"] as? String, "iphone-local-ai")
+        let features = try XCTUnwrap(capabilitiesBody["features"] as? [String: Any])
+        XCTAssertEqual(features["usb_forwarding"] as? Bool, true)
 
         let metrics = await dispatch(server, method: "GET", path: "/metrics")
         XCTAssertEqual(metrics.status, 200)

@@ -7,6 +7,7 @@ final class AppState: ObservableObject {
     @Published private(set) var serverRunning = false
     @Published private(set) var serverStarting = false
     @Published private(set) var modelLoading = false
+    @Published private(set) var modelImporting = false
     @Published private(set) var apiKey = ""
     @Published private(set) var installedModels: [InstalledModel] = []
     @Published private(set) var metricsSnapshot: MetricsSnapshot?
@@ -183,6 +184,23 @@ final class AppState: ObservableObject {
         } catch {
             lastError = "Model import failed: \(error.localizedDescription)"
         }
+    }
+
+    /// Imports `.litertlm` files placed in the app's Documents folder (USB file transfer or Files app).
+    func importModelsFromDocuments() async {
+        guard !modelImporting else { return }
+        modelImporting = true
+        defer { modelImporting = false }
+        do {
+            let imported = try await modelManager.importInbox()
+            if !imported.isEmpty {
+                await logs.write(.info, event: "models_imported_from_documents", details: "count=\(imported.count)")
+                lastError = nil
+            }
+        } catch {
+            lastError = "Model import from Documents failed: \(error.localizedDescription)"
+        }
+        await refresh()
     }
 
     func loadModel(_ id: String) async {
