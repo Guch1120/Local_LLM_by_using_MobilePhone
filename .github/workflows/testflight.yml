@@ -48,7 +48,7 @@ jobs:
           EXCLUDED_ARCHS=x86_64
           CODE_SIGNING_ALLOWED=NO test
 
-      - name: Archive with automatic signing
+      - name: Archive unsigned for App Store export
         run: >-
           xcodebuild -project iPhoneLocalAI.xcodeproj
           -scheme iPhoneLocalAI
@@ -56,13 +56,10 @@ jobs:
           -destination 'generic/platform=iOS'
           -archivePath "$RUNNER_TEMP/iPhoneLocalAI.xcarchive"
           DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
-          CODE_SIGN_STYLE=Automatic
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
           CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
           GIT_COMMIT_SHA="$GITHUB_SHA"
-          -allowProvisioningUpdates
-          -authenticationKeyPath "$APPSTORE_API_KEY_PATH"
-          -authenticationKeyID "$APPSTORE_API_KEY_ID"
-          -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
           archive
 
       - name: Export and upload with cloud-managed signing
