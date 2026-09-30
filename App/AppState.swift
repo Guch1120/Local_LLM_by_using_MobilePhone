@@ -169,7 +169,7 @@ final class AppState: ObservableObject {
 
     func applyPort(_ newPort: Int) async {
         guard (1024...65535).contains(newPort) else {
-            lastError = "Port must be between 1024 and 65535."
+            lastError = "ポートは 1024〜65535 の範囲で指定してください。"
             return
         }
         port = newPort
@@ -228,7 +228,7 @@ final class AppState: ObservableObject {
             drawing.fillEllipse(in: CGRect(x: 142, y: 124, width: 78, height: 78))
         }
         guard let data = image.pngData() else {
-            lastError = "Could not create the built-in vision benchmark image."
+            lastError = "ベンチマーク用の画像を作成できませんでした。"
             return
         }
         await runBenchmark(text: "Describe the colored shapes in this image.", image: ImageInput(data: data, mimeType: "image/png"))
@@ -236,18 +236,18 @@ final class AppState: ObservableObject {
 
     func applyInferenceDefaults(maxTokens: Int, temperature: Double, contextTokens: Int, multiTokenPredictionEnabled: Bool) async {
         guard !modelLoading, !benchmarkRunning else {
-            lastError = "Wait for the current model operation to finish before applying inference settings."
+            lastError = "モデルの処理が終わってから推論設定を適用してください。"
             return
         }
         modelLoading = true
         defer { modelLoading = false }
         guard !(await inference.hasActiveGeneration()) else {
-            lastError = "Wait for the active inference request to finish before applying inference settings."
+            lastError = "実行中の推論が終わってから推論設定を適用してください。"
             return
         }
         guard (1...8192).contains(maxTokens), temperature.isFinite, (0...2).contains(temperature),
               [1024, 2048, 4096, 8192].contains(contextTokens), maxTokens <= contextTokens else {
-            lastError = "Output tokens must fit within the context limit; temperature must be between 0 and 2."
+            lastError = "出力トークン数はコンテキスト上限以下、temperature は 0〜2 で指定してください。"
             return
         }
 
@@ -270,7 +270,7 @@ final class AppState: ObservableObject {
 
         if shouldReloadModel, let id = active.id {
             guard let model = await modelManager.model(id: id) else {
-                lastError = "The loaded model is missing from the model registry. It was unloaded when inference settings changed."
+                lastError = "ロード中のモデルが登録情報に見つからないため、推論設定の変更時にアンロードしました。"
                 if shouldRestart { await startServer() }
                 await refresh()
                 return
@@ -278,12 +278,12 @@ final class AppState: ObservableObject {
             do {
                 try await inference.unloadModel()
                 guard try await modelManager.verifyModel(id: id) else {
-                    throw InferenceError.backendUnavailable("The model file is missing or its SHA-256 no longer matches the registry.")
+                    throw InferenceError.backendUnavailable("モデルファイルが見つからないか、SHA-256 が登録時と一致しません。")
                 }
                 try await inference.loadImportedModel(model, contextTokens: contextTokens, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
                 lastError = nil
             } catch {
-                lastError = "Model reload failed after changing the context limit: \(error.localizedDescription)"
+                lastError = "コンテキスト上限の変更後、モデルの再ロードに失敗しました: \(error.localizedDescription)"
             }
         }
 
@@ -303,7 +303,7 @@ final class AppState: ObservableObject {
         defer { benchmarkRunning = false }
         let active = await inference.activeModel()
         guard active.loaded, let modelID = active.id else {
-            lastError = "Load a model before running a benchmark."
+            lastError = "ベンチマークの前にモデルをロードしてください。"
             return
         }
         var parts: [MessagePart] = [.text(text)]
@@ -321,7 +321,7 @@ final class AppState: ObservableObject {
             lastError = nil
             await logs.write(.info, event: "benchmark_completed", requestID: request.id, details: image == nil ? "kind=text" : "kind=vision")
         } catch {
-            lastError = "Benchmark failed: \(error.localizedDescription)"
+            lastError = "ベンチマークに失敗しました: \(error.localizedDescription)"
         }
         await refresh()
     }
@@ -359,7 +359,7 @@ extension AppState {
             lastError = nil
             await refresh()
         } catch {
-            lastError = "Model import failed: \(error.localizedDescription)"
+            lastError = "モデルの取り込みに失敗しました: \(error.localizedDescription)"
         }
     }
 
@@ -375,7 +375,7 @@ extension AppState {
                 lastError = nil
             }
         } catch {
-            lastError = "Model import from Documents failed: \(error.localizedDescription)"
+            lastError = "Documents フォルダからの取り込みに失敗しました: \(error.localizedDescription)"
         }
         await refresh()
     }
@@ -421,18 +421,18 @@ extension AppState {
         modelLoading = true
         defer { modelLoading = false }
         guard !(await inference.hasActiveGeneration()) else {
-            lastError = "Wait for the active inference request to finish before loading a model."
+            lastError = "実行中の推論が終わってからモデルをロードしてください。"
             return
         }
         guard let model = await modelManager.model(id: id) else {
-            lastError = "The selected model is no longer installed."
+            lastError = "選択したモデルはインストールされていません。"
             return
         }
         var stage = "verify"
         await logs.write(.info, event: "model_verifying", details: "model=\(id)")
         do {
             guard try await modelManager.verifyModel(id: id) else {
-                throw InferenceError.backendUnavailable("The model file is missing or its SHA-256 no longer matches the registry.")
+                throw InferenceError.backendUnavailable("モデルファイルが見つからないか、SHA-256 が登録時と一致しません。")
             }
             stage = "load"
             try await inference.loadImportedModel(model, contextTokens: contextTokens, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
@@ -457,7 +457,7 @@ extension AppState {
         modelLoading = true
         defer { modelLoading = false }
         guard !(await inference.hasActiveGeneration()) else {
-            lastError = "Wait for the active inference request to finish before unloading the model."
+            lastError = "実行中の推論が終わってからモデルをアンロードしてください。"
             return
         }
         do {
@@ -474,7 +474,7 @@ extension AppState {
         modelLoading = true
         defer { modelLoading = false }
         guard !(await inference.hasActiveGeneration()) else {
-            lastError = "Wait for the active inference request to finish before deleting a model."
+            lastError = "実行中の推論が終わってからモデルを削除してください。"
             return
         }
         do {
@@ -489,7 +489,7 @@ extension AppState {
             await logs.write(.info, event: "model_removed", details: "model=\(id)")
             await refresh()
         } catch {
-            lastError = "Could not remove model: \(error.localizedDescription)"
+            lastError = "モデルを削除できませんでした: \(error.localizedDescription)"
         }
     }
 }
@@ -534,7 +534,7 @@ extension AppState {
             lastError = nil
             Task { [details] in await logs.write(.info, event: "model_download_started", details: details) }
         } catch {
-            lastError = "The download could not start: \(error.localizedDescription)"
+            lastError = "ダウンロードを開始できませんでした: \(error.localizedDescription)"
         }
     }
 
@@ -549,7 +549,7 @@ extension AppState {
             let details = "repository=\(repository) projector=\(projector.path) model=\(modelID)"
             Task { await logs.write(.info, event: "model_download_started", details: details) }
         } catch {
-            lastError = "The download could not start: \(error.localizedDescription)"
+            lastError = "ダウンロードを開始できませんでした: \(error.localizedDescription)"
         }
     }
 
@@ -576,7 +576,7 @@ extension AppState {
             hasHuggingFaceToken = huggingFaceTokenStore.load() != nil
             lastError = nil
         } catch {
-            lastError = "The Hugging Face token could not be saved: \(error.localizedDescription)"
+            lastError = "Hugging Face のトークンを保存できませんでした: \(error.localizedDescription)"
         }
     }
 

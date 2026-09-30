@@ -22,19 +22,19 @@ struct HuggingFaceBrowserView: View {
     var body: some View {
         List {
             Section {
-                Picker("Format", selection: $ggufOnly) {
+                Picker("形式", selection: $ggufOnly) {
                     Text("GGUF").tag(true)
-                    Text("All formats").tag(false)
+                    Text("すべての形式").tag(false)
                 }
                 .pickerStyle(.segmented)
-                Picker("Use", selection: $use) {
+                Picker("用途", selection: $use) {
                     ForEach(ModelUse.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 Text(
-                    "Image + text lists models that take pictures; they need an image projector (mmproj), "
-                        + "which the download menu adds. GGUF models run on llama.cpp. "
-                        + "Choose All formats to find .litertlm models (for example \"litert-community\")."
+                    "「画像+テキスト」は画像を入力できるモデルです。画像入力には image projector（mmproj）が必要で、"
+                        + "ダウンロードメニューから一緒に入手できます。GGUF モデルは llama.cpp で動きます。"
+                        + ".litertlm モデルを探すときは「すべての形式」を選んでください（例: \"litert-community\"）。"
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -44,7 +44,7 @@ struct HuggingFaceBrowserView: View {
                 if searching {
                     HStack(spacing: 10) {
                         ProgressView()
-                        Text("Searching Hugging Face.").font(.footnote)
+                        Text("Hugging Face を検索中です。").font(.footnote)
                     }
                 }
                 if let searchError {
@@ -60,17 +60,17 @@ struct HuggingFaceBrowserView: View {
                     }
                 }
                 if !searching, searchError == nil, results.isEmpty {
-                    Text("No models found.")
+                    Text("モデルが見つかりません。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text(query.trimmingCharacters(in: .whitespaces).isEmpty ? "Most downloaded" : "Results")
+                Text(query.trimmingCharacters(in: .whitespaces).isEmpty ? "ダウンロード数の多い順" : "検索結果")
             }
         }
         .navigationTitle("Hugging Face")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search models")
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "モデルを検索")
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
         .onSubmit(of: .search) { Task { await search() } }
@@ -91,7 +91,7 @@ struct HuggingFaceBrowserView: View {
                 Label(Self.compact(model.downloads), systemImage: "arrow.down.circle")
                 Label(Self.compact(model.likes), systemImage: "heart")
                 if model.gated {
-                    Label("Gated", systemImage: "lock")
+                    Label("承認が必要", systemImage: "lock")
                 }
             }
             .font(.caption)
@@ -107,11 +107,11 @@ struct HuggingFaceBrowserView: View {
         if let pipelineTag {
             switch ModelUse.supported(pipelineTag: pipelineTag) {
             case .vision?:
-                Label("Image + text", systemImage: "photo").font(.caption).foregroundStyle(.blue)
+                Label("画像+テキスト", systemImage: "photo").font(.caption).foregroundStyle(.blue)
             case .text?:
-                Label("Text", systemImage: "text.alignleft").font(.caption).foregroundStyle(.secondary)
+                Label("テキスト", systemImage: "text.alignleft").font(.caption).foregroundStyle(.secondary)
             default:
-                Label("Not supported: \(pipelineTag)", systemImage: "nosign").font(.caption).foregroundStyle(.orange)
+                Label("非対応: \(pipelineTag)", systemImage: "nosign").font(.caption).foregroundStyle(.orange)
             }
         }
     }
@@ -152,7 +152,7 @@ struct HuggingFaceRepositoryView: View {
                 if loading {
                     HStack(spacing: 10) {
                         ProgressView()
-                        Text("Reading the file list.").font(.footnote)
+                        Text("ファイル一覧を取得中です。").font(.footnote)
                     }
                 }
                 if let loadError {
@@ -161,7 +161,7 @@ struct HuggingFaceRepositoryView: View {
                         .foregroundStyle(.orange)
                 }
                 if !loading, loadError == nil, files.isEmpty {
-                    Text("This repository has no .gguf or .litertlm files.")
+                    Text("このリポジトリには .gguf / .litertlm ファイルがありません。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -171,9 +171,9 @@ struct HuggingFaceRepositoryView: View {
                 Section {
                     ForEach(models) { file in fileRow(file) }
                 } header: {
-                    Text("Model files")
+                    Text("モデルファイル")
                 } footer: {
-                    Text("Smaller quantizations (Q4) load faster and leave more memory for the context.")
+                    Text("量子化の小さいもの（Q4）ほどロードが速く、コンテキストに使えるメモリが増えます。")
                 }
             }
             let projectors = files.filter(\.isProjector)
@@ -181,11 +181,11 @@ struct HuggingFaceRepositoryView: View {
                 Section {
                     ForEach(projectors) { file in fileRow(file) }
                 } header: {
-                    Text("Image projectors")
+                    Text("画像用プロジェクタ（mmproj）")
                 } footer: {
                     Text(
-                        "Image input needs the model and a projector. The model's download menu adds one; "
-                            + "a projector downloaded here attaches to the most recently installed GGUF model."
+                        "画像入力にはモデル本体とプロジェクタの両方が必要です。モデルのダウンロードメニューから一緒に入手できます。"
+                            + "ここで単体でダウンロードしたプロジェクタは、最後にインストールした GGUF モデルに紐付きます。"
                     )
                 }
             }
@@ -201,11 +201,11 @@ struct HuggingFaceRepositoryView: View {
                         .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("Not usable on their own")
+                    Text("単体では使えないファイル")
                 } footer: {
                     Text(
-                        "MTP files are small helper models that speed up their main model. "
-                            + "This app cannot load them, so they are not offered for download."
+                        "MTP ファイルは、本体モデルの生成を速めるための小さな補助モデルです。"
+                            + "このアプリでは読み込めないため、ダウンロードの対象外です。"
                     )
                 }
             }
@@ -240,11 +240,11 @@ struct HuggingFaceRepositoryView: View {
     private func fitLabel(_ fit: ModelFit) -> some View {
         switch fit {
         case .comfortable:
-            Label("Fits this iPhone", systemImage: "checkmark.circle").foregroundStyle(.green)
+            Label("この iPhone で動作可", systemImage: "checkmark.circle").foregroundStyle(.green)
         case .tight:
-            Label("Tight on memory", systemImage: "exclamationmark.circle").foregroundStyle(.orange)
+            Label("メモリに余裕なし", systemImage: "exclamationmark.circle").foregroundStyle(.orange)
         case .tooLarge:
-            Label("Too large", systemImage: "xmark.circle").foregroundStyle(.red)
+            Label("大きすぎます", systemImage: "xmark.circle").foregroundStyle(.red)
         }
     }
 
@@ -261,10 +261,10 @@ struct HuggingFaceRepositoryView: View {
                     Button {
                         appState.startProjectorDownload(repository: repository, projector: projector, modelID: installed.id)
                     } label: {
-                        Label("Add image input (\(Self.size(projector)))", systemImage: "photo")
+                        Label("画像入力を追加（\(Self.size(projector))）", systemImage: "photo")
                     }
                 } label: {
-                    Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Label("インストール済み", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 }
             } else {
                 installedMark
@@ -272,30 +272,30 @@ struct HuggingFaceRepositoryView: View {
         } else if download?.state == .completed || isInstalled(file) {
             installedMark
         } else if !file.isProjector, file.fileName.lowercased().hasSuffix(".gguf"), let projector = smallestProjector {
-            Menu("Download") {
+            Menu("ダウンロード") {
                 Button {
                     appState.startDownload(repository: repository, file: file, projector: projector)
                 } label: {
-                    Label("With image input (+\(Self.size(projector)))", systemImage: "photo")
+                    Label("画像入力つき（+\(Self.size(projector))）", systemImage: "photo")
                 }
                 Button {
                     appState.startDownload(repository: repository, file: file)
                 } label: {
-                    Label("Model only (text)", systemImage: "text.alignleft")
+                    Label("モデルのみ（テキスト）", systemImage: "text.alignleft")
                 }
             }
             .buttonStyle(.bordered)
         } else {
-            Button("Download") { appState.startDownload(repository: repository, file: file) }
+            Button("ダウンロード") { appState.startDownload(repository: repository, file: file) }
                 .buttonStyle(.bordered)
         }
     }
 
     private var installedMark: some View {
-        Label("Installed", systemImage: "checkmark.circle.fill")
+        Label("インストール済み", systemImage: "checkmark.circle.fill")
             .labelStyle(.iconOnly)
             .foregroundStyle(.green)
-            .accessibilityLabel("Installed")
+            .accessibilityLabel("インストール済み")
     }
 
     /// The projector offered with a model: the smallest one keeps memory free for the model.
@@ -315,8 +315,8 @@ struct HuggingFaceRepositoryView: View {
     private func progressText(_ download: ModelDownload) -> String {
         switch download.state {
         case .downloading: return download.fraction.formatted(.percent.precision(.fractionLength(0)))
-        case .importing: return "Installing"
-        default: return "Queued"
+        case .importing: return "インストール中"
+        default: return "待機中"
         }
     }
 
@@ -347,9 +347,9 @@ struct ModelDownloadsSection: View {
             Section {
                 ForEach(appState.downloads) { download in row(download) }
             } header: {
-                Text("Downloads")
+                Text("ダウンロード")
             } footer: {
-                Text("Downloads run while the app is open. Keep the app in the foreground until they finish.")
+                Text("ダウンロードはアプリを開いている間だけ進みます。完了するまでアプリを前面に表示しておいてください。")
             }
         }
     }
@@ -362,14 +362,14 @@ struct ModelDownloadsSection: View {
                     .lineLimit(2)
                 Spacer()
                 if download.state == .failed {
-                    Button("Retry") { appState.retryDownload(download.id) }
+                    Button("再試行") { appState.retryDownload(download.id) }
                         .buttonStyle(.bordered)
                 }
                 Button { appState.removeDownload(download.id) } label: {
                     Image(systemName: download.isActive ? "xmark.circle" : "xmark")
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel(download.isActive ? "Cancel download" : "Remove from list")
+                .accessibilityLabel(download.isActive ? "ダウンロードをキャンセル" : "一覧から削除")
             }
             if download.state == .downloading {
                 ProgressView(value: download.fraction)
@@ -385,16 +385,16 @@ struct ModelDownloadsSection: View {
         let total = ByteCountFormatter.string(fromByteCount: download.totalBytes, countStyle: .file)
         switch download.state {
         case .queued:
-            return "Waiting · \(total)"
+            return "待機中 · \(total)"
         case .downloading:
             let received = ByteCountFormatter.string(fromByteCount: download.receivedBytes, countStyle: .file)
-            return "\(received) of \(total)"
+            return "\(received) / \(total)"
         case .importing:
-            return "Verifying and installing…"
+            return "検証してインストール中…"
         case .completed:
-            return "Installed as \(download.modelID ?? download.fileName)"
+            return "インストール済み: \(download.modelID ?? download.fileName)"
         case .failed:
-            return download.error ?? "The download failed."
+            return download.error ?? "ダウンロードに失敗しました。"
         }
     }
 }

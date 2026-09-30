@@ -15,42 +15,42 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("HTTP server") {
+                Section("HTTP サーバー") {
                     HStack {
-                        TextField("Port", text: $portText)
+                        TextField("ポート", text: $portText)
                             .keyboardType(.numberPad)
                             .textFieldStyle(.roundedBorder)
-                        Button("Apply") {
+                        Button("適用") {
                             if let value = Int(portText) { Task { await appState.applyPort(value) } }
                         }
                         .buttonStyle(.bordered)
                     }
-                    Toggle("Allow LAN connections", isOn: Binding(
+                    Toggle("LAN からの接続を許可", isOn: Binding(
                         get: { appState.allowLAN },
                         set: { enabled in Task { await appState.setLANEnabled(enabled) } }
                     ))
                     Text(appState.allowLAN
-                         ? "The API listens on all network interfaces. Use only on a trusted network."
-                         : "The API listens on localhost for USB port forwarding. LAN access is off.")
+                         ? "すべてのネットワークインターフェースで待ち受けます。信頼できるネットワークでのみ使ってください。"
+                         : "USB のポート転送用に localhost だけで待ち受けます。LAN からの接続は無効です。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Inference defaults") {
+                Section("推論の既定値") {
                     Stepper(value: $maxTokens, in: 1...contextTokens) {
-                        LabeledContent("Default output tokens", value: "\(maxTokens)")
+                        LabeledContent("既定の出力トークン数", value: "\(maxTokens)")
                     }
-                    Picker("Context limit", selection: $contextTokens) {
+                    Picker("コンテキスト上限", selection: $contextTokens) {
                         ForEach([1024, 2048, 4096, 8192], id: \.self) { value in
-                            Text("\(value) tokens").tag(value)
+                            Text("\(String(value)) トークン").tag(value)
                         }
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        LabeledContent("Default temperature", value: String(format: "%.1f", temperature))
+                        LabeledContent("既定の temperature", value: String(format: "%.1f", temperature))
                         Slider(value: $temperature, in: 0...2, step: 0.1)
-                            .accessibilityLabel("Default temperature")
+                            .accessibilityLabel("既定の temperature")
                     }
-                    Button("Apply inference settings") {
+                    Button("推論設定を適用") {
                         Task {
                             await appState.applyInferenceDefaults(
                                 maxTokens: maxTokens,
@@ -61,34 +61,34 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(maxTokens > contextTokens)
-                    Toggle("Multi-Token Prediction (experimental)", isOn: $multiTokenPredictionEnabled)
-                    Text("These values are defaults; OpenAI requests can override output tokens and temperature. Changing context or MTP reloads a loaded LiteRT model.")
+                    Toggle("Multi-Token Prediction（実験的）", isOn: $multiTokenPredictionEnabled)
+                    Text("これらは既定値です。OpenAI 形式のリクエストで出力トークン数と temperature を上書きできます。コンテキスト上限または MTP を変えると、ロード中の LiteRT モデルを再ロードします。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Inference backend") {
-                    LabeledContent("Available backends", value: "Mock · LiteRT-LM · llama.cpp")
-                    Text(".litertlm models run on LiteRT-LM (GPU first, CPU as a fallback, text only). .gguf models run on llama.cpp with Metal and take images when an mmproj file is installed.")
+                Section("推論バックエンド") {
+                    LabeledContent("利用できるバックエンド", value: "Mock · LiteRT-LM · llama.cpp")
+                    Text(".litertlm モデルは LiteRT-LM で動きます（GPU 優先、CPU にフォールバック、テキストのみ）。.gguf モデルは llama.cpp（Metal）で動き、mmproj ファイルがあれば画像も入力できます。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    LabeledContent("MTP setting", value: multiTokenPredictionEnabled ? "Enabled" : "Disabled")
-                    Text("Multi-Token Prediction is a LiteRT-LM experimental decoding option. Its speed and memory effects need measurement on iPhone.")
+                    LabeledContent("MTP の設定", value: multiTokenPredictionEnabled ? "有効" : "無効")
+                    Text("Multi-Token Prediction は LiteRT-LM の実験的なデコード機能です。速度とメモリへの影響は iPhone 上での計測が必要です。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    LabeledContent("USB forwarding", value: "Host-side iproxy")
-                    Text("USB forwarding is provided by usbmuxd/libimobiledevice on the PC.")
+                    LabeledContent("USB 転送", value: "PC 側の iproxy")
+                    Text("USB 転送は PC 側の usbmuxd / libimobiledevice が行います。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Bearer API key") {
+                Section("Bearer API キー") {
                     HStack {
                         Group {
                             if revealKey {
                                 Text(appState.apiKey).textSelection(.enabled)
                             } else {
-                                SecureField("API key", text: .constant(appState.apiKey))
+                                SecureField("API キー", text: .constant(appState.apiKey))
                                     .disabled(true)
                             }
                         }
@@ -96,47 +96,47 @@ struct SettingsView: View {
                         Button { revealKey.toggle() } label: {
                             Image(systemName: revealKey ? "eye.slash" : "eye")
                         }
-                        .accessibilityLabel(revealKey ? "Hide API key" : "Show API key")
+                        .accessibilityLabel(revealKey ? "API キーを隠す" : "API キーを表示")
                     }
                     Button {
                         UIPasteboard.general.string = appState.apiKey
                         copied = true
                     } label: {
-                        Label(copied ? "Copied" : "Copy API key", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        Label(copied ? "コピーしました" : "API キーをコピー", systemImage: copied ? "checkmark" : "doc.on.doc")
                     }
-                    Button("Generate a new API key", role: .destructive) {
+                    Button("新しい API キーを生成", role: .destructive) {
                         Task { await appState.regenerateAPIKey() }
                     }
-                    Text("The key is stored in Keychain. Regenerating it immediately invalidates the old key.")
+                    Text("キーは Keychain に保存されます。再生成すると古いキーはすぐに使えなくなります。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 Section("Hugging Face") {
-                    SecureField(appState.hasHuggingFaceToken ? "Access token saved" : "Access token (optional)", text: $huggingFaceToken)
+                    SecureField(appState.hasHuggingFaceToken ? "アクセストークン保存済み" : "アクセストークン（任意）", text: $huggingFaceToken)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    Button("Save token") {
+                    Button("トークンを保存") {
                         appState.setHuggingFaceToken(huggingFaceToken)
                         huggingFaceToken = ""
                     }
                     .disabled(huggingFaceToken.trimmingCharacters(in: .whitespaces).isEmpty)
                     if appState.hasHuggingFaceToken {
-                        Button("Remove token", role: .destructive) { appState.setHuggingFaceToken("") }
+                        Button("トークンを削除", role: .destructive) { appState.setHuggingFaceToken("") }
                     }
-                    Text("Only gated or private repositories need a token. It is stored in Keychain and sent only to huggingface.co.")
+                    Text("トークンが必要なのは gated / private リポジトリだけです。Keychain に保存され、huggingface.co にのみ送信されます。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Runtime") {
-                    LabeledContent("Execution", value: "Foreground only")
-                    LabeledContent("Default endpoint", value: "\(appState.endpoint)/v1")
-                    LabeledContent("Prompt logging", value: "Off")
+                Section("実行環境") {
+                    LabeledContent("実行", value: "フォアグラウンドのみ")
+                    LabeledContent("既定のエンドポイント", value: "\(appState.endpoint)/v1")
+                    LabeledContent("プロンプトのログ記録", value: "なし")
                 }
                 Section { ErrorBanner().listRowInsets(EdgeInsets()) }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("設定")
             .onAppear {
                 portText = String(appState.port)
                 maxTokens = appState.defaultMaxTokens

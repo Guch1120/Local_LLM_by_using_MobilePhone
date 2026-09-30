@@ -7,19 +7,19 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selection) {
             ServerStatusView()
-                .tabItem { Label("Server", systemImage: "dot.radiowaves.left.and.right") }
+                .tabItem { Label("サーバー", systemImage: "dot.radiowaves.left.and.right") }
                 .tag("server")
             ModelManagerView()
-                .tabItem { Label("Models", systemImage: "shippingbox") }
+                .tabItem { Label("モデル", systemImage: "shippingbox") }
                 .tag("models")
             SettingsView()
-                .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tabItem { Label("設定", systemImage: "gearshape") }
                 .tag("settings")
             DiagnosticsView()
-                .tabItem { Label("Diagnostics", systemImage: "waveform.path.ecg") }
+                .tabItem { Label("診断", systemImage: "waveform.path.ecg") }
                 .tag("diagnostics")
             LogsView()
-                .tabItem { Label("Logs", systemImage: "list.bullet.rectangle") }
+                .tabItem { Label("ログ", systemImage: "list.bullet.rectangle") }
                 .tag("logs")
         }
     }
@@ -40,7 +40,7 @@ struct ErrorBanner: View {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.semibold))
                 }
-                .accessibilityLabel("Dismiss error")
+                .accessibilityLabel("エラーを閉じる")
             }
             .padding(12)
             .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))

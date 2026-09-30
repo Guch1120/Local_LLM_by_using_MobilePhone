@@ -7,7 +7,7 @@ struct LogsView: View {
         NavigationStack {
             List {
                 if appState.logEntries.isEmpty {
-                    ContentUnavailableView("No log entries", systemImage: "list.bullet.rectangle", description: Text("Server and inference lifecycle events will appear here."))
+                    ContentUnavailableView("ログはありません", systemImage: "list.bullet.rectangle", description: Text("サーバーと推論の動作記録がここに表示されます。"))
                 } else {
                     ForEach(appState.logEntries) { entry in
                         VStack(alignment: .leading, spacing: 5) {
@@ -23,7 +23,7 @@ struct LogsView: View {
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
                             if let requestID = entry.requestID {
-                                Text("request \(requestID)").font(.caption2.monospaced()).foregroundStyle(.secondary)
+                                Text("リクエスト \(requestID)").font(.caption2.monospaced()).foregroundStyle(.secondary)
                             }
                             if let details = entry.details {
                                 Text(details).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
@@ -33,12 +33,12 @@ struct LogsView: View {
                     }
                 }
             }
-            .navigationTitle("Logs")
+            .navigationTitle("ログ")
             .refreshable { await appState.refresh() }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { Task { await appState.refresh() } } label: { Image(systemName: "arrow.clockwise") }
-                        .accessibilityLabel("Refresh logs")
+                        .accessibilityLabel("ログを更新")
                 }
             }
         }

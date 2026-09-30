@@ -15,6 +15,7 @@ Build a foreground iOS app that runs local text and image inference and exposes 
 - Keep LAN exposure opt-in; do not silently expose the API to the local network.
 - Do not commit secrets, provisioning profiles, signing certificates, or model files.
 - Keep the API and errors documented when their behavior changes.
+- The app's user-visible text (labels, explanations, and error messages shown on screen) is Japanese. API error types, log event names, and identifiers stay English.
 
 ## Build and verification
 

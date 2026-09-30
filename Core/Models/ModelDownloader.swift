@@ -39,16 +39,16 @@ enum ModelDownloadError: Error, LocalizedError {
         switch self {
         case let .insufficientSpace(needed, available):
             let formatter = ByteCountFormatter()
-            return "Not enough free storage: \(formatter.string(fromByteCount: needed)) needed, "
-                + "\(formatter.string(fromByteCount: available)) available."
+            return "空き容量が足りません（必要: \(formatter.string(fromByteCount: needed))、"
+                + "空き: \(formatter.string(fromByteCount: available))）。"
         case .http(401), .http(403):
             return HuggingFaceError.unauthorized.errorDescription
         case .http(404):
             return HuggingFaceError.notFound.errorDescription
         case let .http(status):
-            return "The download failed with HTTP \(status)."
+            return "ダウンロードが HTTP \(status) で失敗しました。"
         case .importUnavailable:
-            return "The downloaded file could not be imported."
+            return "ダウンロードしたファイルを取り込めませんでした。"
         }
     }
 }

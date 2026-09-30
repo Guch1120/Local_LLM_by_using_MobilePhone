@@ -91,22 +91,22 @@ struct LiveRequestView: View {
                                 .scaledToFit()
                                 .frame(maxHeight: expanded ? 320 : 160)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .accessibilityLabel("Input image")
+                                .accessibilityLabel("入力画像")
                         }
                     }
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(request.earlierMessages > 0 ? "Input (after \(request.earlierMessages) earlier messages)" : "Input")
+                Text(request.earlierMessages > 0 ? "入力（これより前に \(request.earlierMessages) 件のメッセージ）" : "入力")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Text(request.prompt.isEmpty ? "(no text)" : request.prompt)
+                Text(request.prompt.isEmpty ? "（テキストなし）" : request.prompt)
                     .font(.callout)
                     .lineLimit(expanded ? nil : 6)
                     .textSelection(.enabled)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text("Output")
+                Text("出力")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 if expanded {
@@ -135,12 +135,12 @@ struct LiveRequestView: View {
     private var statusText: String {
         var parts: [String]
         switch request.state {
-        case .generating: parts = ["Generating"]
-        case .completed: parts = ["Done"]
-        case .failed: parts = ["Failed"]
+        case .generating: parts = ["生成中"]
+        case .completed: parts = ["完了"]
+        case .failed: parts = ["失敗"]
         }
         if let seconds = request.secondsToFirstPiece {
-            parts.append(String(format: "first token %.1f s", seconds))
+            parts.append(String(format: "最初のトークンまで %.1f 秒", seconds))
         }
         if let speed = request.piecesPerSecond {
             parts.append(String(format: "%.1f tok/s", speed))
@@ -160,7 +160,7 @@ struct LiveRequestScreen: View {
                     if let live = appState.liveRequest {
                         LiveRequestView(request: live, expanded: true)
                     } else {
-                        Text("The prompt, the image and the reply appear here while a request runs.")
+                        Text("リクエストの実行中、入力テキスト・画像・出力がここに表示されます。")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -170,7 +170,7 @@ struct LiveRequestScreen: View {
             }
             .onChange(of: appState.liveRequest?.output) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
         }
-        .navigationTitle("Live request")
+        .navigationTitle("実行中のリクエスト")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

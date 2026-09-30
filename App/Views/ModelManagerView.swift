@@ -14,12 +14,12 @@ struct ModelManagerView: View {
             List {
                 Section {
                     Button { showingBrowser = true } label: {
-                        Label("Browse Hugging Face", systemImage: "magnifyingglass")
+                        Label("Hugging Face で探す", systemImage: "magnifyingglass")
                     }
-                    Text("Search for GGUF or LiteRT-LM models and download them straight to this iPhone.")
+                    Text("GGUF / LiteRT-LM モデルを検索して、この iPhone に直接ダウンロードします。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                } header: { Text("Get models") }
+                } header: { Text("モデルを入手") }
 
                 ModelDownloadsSection()
 
@@ -27,22 +27,22 @@ struct ModelManagerView: View {
                     if appState.modelImporting {
                         HStack(spacing: 10) {
                             ProgressView()
-                            Text("Importing model files from Documents.")
+                            Text("Documents フォルダからモデルを取り込み中です。")
                                 .font(.footnote)
                         }
                     }
                     if appState.modelLoading {
                         HStack(spacing: 10) {
                             ProgressView()
-                            Text("Loading model. This can take several minutes.")
+                            Text("モデルをロード中です。数分かかることがあります。")
                                 .font(.footnote)
                         }
                     }
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Mock development backend")
+                            Text("開発用モックバックエンド")
                                 .font(.headline)
-                            Text("No model file is required. API responses are deterministic test text.")
+                            Text("モデルファイルは不要です。API は決まったテスト用の文章を返します。")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -52,45 +52,45 @@ struct ModelManagerView: View {
                         }
                     }
                     if appState.metricsSnapshot?.model != "mock-echo" {
-                        Button("Unload active model") { Task { await appState.unloadModel() } }
+                        Button("使用中のモデルをアンロード") { Task { await appState.unloadModel() } }
                             .disabled(appState.modelLoading)
                     }
-                } header: { Text("Built-in backend") }
+                } header: { Text("内蔵バックエンド") }
 
                 Section {
                     if appState.installedModels.isEmpty {
-                        ContentUnavailableView("No imported models", systemImage: "shippingbox", description: Text("Import a compatible .litertlm or .gguf file to register it on this device."))
+                        ContentUnavailableView("モデルがありません", systemImage: "shippingbox", description: Text(".litertlm または .gguf ファイルを取り込むと、この端末に登録されます。"))
                             .listRowBackground(Color.clear)
                     } else {
                         ForEach(appState.installedModels) { model in
                             modelRow(model)
                         }
                     }
-                } header: { Text("Installed models") }
+                } header: { Text("インストール済みモデル") }
 
                 Section {
                     Button { showingImporter = true } label: {
-                        Label("Import model file", systemImage: "square.and.arrow.down")
+                        Label("モデルファイルを取り込む", systemImage: "square.and.arrow.down")
                     }
                     .disabled(appState.modelLoading)
                     Button { Task { await appState.importModelsFromDocuments() } } label: {
-                        Label("Import from Documents folder", systemImage: "folder")
+                        Label("Documents フォルダから取り込む", systemImage: "folder")
                     }
                     .disabled(appState.modelLoading || appState.modelImporting)
-                    Text("Files are copied to Application Support and hashed locally.")
+                    Text("ファイルは Application Support にコピーされ、端末内でハッシュ値を計算します。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Text(
-                        ".litertlm and .gguf files placed in this app's Documents folder (Files app or USB) "
-                            + "are moved in automatically when the app opens. A GGUF file named mmproj is attached "
-                            + "to the most recently imported GGUF model for image input."
+                        "このアプリの Documents フォルダ（「ファイル」アプリまたは USB）に置いた .litertlm / .gguf ファイルは、"
+                            + "アプリを開いたときに自動で取り込まれます。名前に mmproj を含む GGUF ファイルは、"
+                            + "最後に取り込んだ GGUF モデルに画像入力用として紐付きます。"
                     )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 Section { ErrorBanner().listRowInsets(EdgeInsets()) }
             }
-            .navigationTitle("Model manager")
+            .navigationTitle("モデル管理")
             .navigationDestination(isPresented: $showingBrowser) {
                 HuggingFaceBrowserView(
                     initialQuery: UserDefaults.standard.string(forKey: "modelBrowserQuery") ?? "",
@@ -125,19 +125,19 @@ struct ModelManagerView: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             HStack {
-                Label("Text", systemImage: "text.alignleft")
+                Label("テキスト", systemImage: "text.alignleft")
                 if model.modalities.contains("image") {
-                    Label("Image", systemImage: "photo")
+                    Label("画像", systemImage: "photo")
                 }
                 Text(model.backend)
                     .foregroundStyle(.secondary)
                 Spacer()
                 if appState.metricsSnapshot?.model == model.id {
-                    Button("Unload") { Task { await appState.unloadModel() } }
+                    Button("アンロード") { Task { await appState.unloadModel() } }
                         .buttonStyle(.bordered)
                         .disabled(appState.modelLoading)
                 } else {
-                    Button("Load") { Task { await appState.loadModel(model.id) } }
+                    Button("ロード") { Task { await appState.loadModel(model.id) } }
                         .buttonStyle(.borderedProminent)
                         .disabled(appState.modelLoading)
                 }
@@ -147,7 +147,7 @@ struct ModelManagerView: View {
         .padding(.vertical, 4)
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { Task { await appState.removeModel(model.id) } } label: {
-                Label("Delete", systemImage: "trash")
+                Label("削除", systemImage: "trash")
             }
             .disabled(appState.modelLoading)
         }

@@ -4,7 +4,7 @@ An iOS app that exposes a local, OpenAI-compatible inference API so a nearby PC 
 
 ## Current implementation
 
-- SwiftUI management screens for server status, imported models, settings, diagnostics, and logs.
+- SwiftUI management screens for server status, imported models, settings, diagnostics, and logs. The app's text is in Japanese.
 - An authenticated HTTP server with `/health`, `/capabilities`, `/diagnostics`, `/metrics`, `/logs`, `/v1/models`, and `/v1/chat/completions` routes.
 - Non-streaming and Server-Sent Events chat completions, including JPEG/PNG data URL parsing.
 - Image inputs are orientation-corrected, resized to a 2048-pixel maximum edge, and recompressed as JPEG before inference.
@@ -12,7 +12,7 @@ An iOS app that exposes a local, OpenAI-compatible inference API so a nearby PC 
 - A persistent, 500-entry on-device diagnostic log with app lifecycle, model, inference, thermal, and error events. Prompt and image contents are not recorded.
 - Model file import into Application Support with a streaming SHA-256 calculation.
 - A live view on the Server tab that shows the running request on the phone: the prompt, the input image and the reply as it streams. It is not stored or logged.
-- A Hugging Face model browser (Models tab → Browse Hugging Face): search repositories, see each model file's size with a memory-fit hint, and download files straight to the phone with progress, cancel and retry. `GET /models` and `POST /models/downloads` do the same from a PC.
+- A Hugging Face model browser (モデル tab → Hugging Face で探す): search repositories, see each model file's size with a memory-fit hint, and download files straight to the phone with progress, cancel and retry. `GET /models` and `POST /models/downloads` do the same from a PC.
 - Saved generation defaults for output length, temperature, LiteRT context length, and experimental Multi-Token Prediction.
 - A privacy manifest for app-local UserDefaults and model-file metadata access; no app tracking or collected data is declared.
 - CI workflows for unsigned iOS Simulator builds on pull requests and signed TestFlight uploads when repository secrets are configured.
@@ -209,17 +209,17 @@ gh secret set DEV_IPA_PASSWORD < ~/.config/iphone-local-ai/dev-ipa-password
 
 ### モデルを USB で転送する
 
-モデル(`.litertlm` / `.gguf`)はアプリに同梱せず、USB でアプリの Documents フォルダへ転送します。アプリは起動時(またはモデル画面の「Import from Documents folder」)に Documents 内のモデルを Application Support へ移動し、SHA-256 を記録して登録します。
+モデル(`.litertlm` / `.gguf`)はアプリに同梱せず、USB でアプリの Documents フォルダへ転送します。アプリは起動時(またはモデル画面の「Documents フォルダから取り込む」)に Documents 内のモデルを Application Support へ移動し、SHA-256 を記録して登録します。
 
 ```bash
 bash scripts/iphone/push_model.sh ~/models/gemma-4-E2B-it.litertlm
 ```
 
-転送中は `.part` という名前で送り、完了後に名前を変えるので、転送途中のファイルが取り込まれることはありません。登録後、モデル画面で「Load」を押すと読み込まれます。iOS 向けには Hugging Face `litert-community` の汎用版(`gemma-4-E2B-it.litertlm` など)を使います。Documents フォルダは「ファイル」アプリからも見えるため、PC を使わずにモデルを置くこともできます。
+転送中は `.part` という名前で送り、完了後に名前を変えるので、転送途中のファイルが取り込まれることはありません。登録後、モデル画面で「ロード」を押すと読み込まれます。iOS 向けには Hugging Face `litert-community` の汎用版(`gemma-4-E2B-it.litertlm` など)を使います。Documents フォルダは「ファイル」アプリからも見えるため、PC を使わずにモデルを置くこともできます。
 
 ### Hugging Face のモデルを試す
 
-アプリ単体でも、Models タブの「Browse Hugging Face」からモデルを検索し、ファイル(量子化)を選んでダウンロードできます。検索は用途で絞り込めます(All / Text / Image + text)。各ファイルにはサイズと「この iPhone に収まるか」の目安が表示されます。画像入力にはモデル本体に加えて image projector(mmproj)が必要です。リポジトリに mmproj がある場合、Download メニューの「With image input」でモデルと一番小さい mmproj をまとめてダウンロードし、そのモデルに紐付けます。導入済みのモデルには「Add image input」で mmproj だけ追加できます。gated / private リポジトリ用のアクセストークンは Settings タブで保存できます(Keychain に保存され、huggingface.co にのみ送信されます)。ダウンロードはアプリを前面に表示している間だけ進みます。
+アプリ単体でも、「モデル」タブの「Hugging Face で探す」からモデルを検索し、ファイル(量子化)を選んでダウンロードできます。検索は用途で絞り込めます(すべて / テキスト / 画像+テキスト)。各ファイルにはサイズと「この iPhone に収まるか」の目安が表示されます。画像入力にはモデル本体に加えて image projector(mmproj)が必要です。リポジトリに mmproj がある場合、「ダウンロード」メニューの「画像入力つき」でモデルと一番小さい mmproj をまとめてダウンロードし、そのモデルに紐付けます。導入済みのモデルには「画像入力を追加」で mmproj だけ追加できます。gated / private リポジトリ用のアクセストークンは「設定」タブで保存できます(Keychain に保存され、huggingface.co にのみ送信されます)。ダウンロードはアプリを前面に表示している間だけ進みます。
 
 PC から同じことを行う API もあります。
 

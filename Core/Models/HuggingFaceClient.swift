@@ -49,9 +49,9 @@ enum ModelUse: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .any: return "All"
-        case .text: return "Text"
-        case .vision: return "Image + text"
+        case .any: return "すべて"
+        case .text: return "テキスト"
+        case .vision: return "画像+テキスト"
         }
     }
 
@@ -110,14 +110,14 @@ enum HuggingFaceError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidRepository:
-            return "Enter a repository as owner/name and a file inside it."
+            return "リポジトリは owner/name の形式で、その中のファイルを指定してください。"
         case .unauthorized:
-            return "Hugging Face denied access. Gated or private repositories need an access token (Settings) "
-                + "from an account that accepted the model's terms."
+            return "Hugging Face にアクセスを拒否されました。gated / private リポジトリには、"
+                + "モデルの利用条件に同意したアカウントのアクセストークン（設定タブ）が必要です。"
         case .notFound:
-            return "The repository or file was not found on Hugging Face."
+            return "Hugging Face にリポジトリまたはファイルが見つかりません。"
         case let .server(status):
-            return "Hugging Face returned HTTP \(status)."
+            return "Hugging Face が HTTP \(status) を返しました。"
         }
     }
 }

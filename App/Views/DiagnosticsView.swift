@@ -6,69 +6,69 @@ struct DiagnosticsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("App build") {
-                    metric("Version / build", value: appBuildText, symbol: "number.square")
-                    metric("Git revision", value: gitRevision, symbol: "chevron.left.forwardslash.chevron.right")
-                    metric("Saved log entries", value: "\(appState.logPersistenceStatus?.entryCount ?? appState.logEntries.count)", symbol: "externaldrive")
-                    metric("Log storage", value: logStorageText, symbol: "checkmark.icloud")
+                Section("アプリのビルド") {
+                    metric("バージョン / ビルド", value: appBuildText, symbol: "number.square")
+                    metric("Git リビジョン", value: gitRevision, symbol: "chevron.left.forwardslash.chevron.right")
+                    metric("保存済みログ件数", value: "\(appState.logPersistenceStatus?.entryCount ?? appState.logEntries.count)", symbol: "externaldrive")
+                    metric("ログの保存先", value: logStorageText, symbol: "checkmark.icloud")
                     if let error = appState.logPersistenceStatus?.lastError {
                         Text(error).font(.footnote).foregroundStyle(.red).textSelection(.enabled)
                     }
                 }
-                Section("Device") {
-                    metric("Thermal state", value: appState.metricsSnapshot?.thermalState.capitalized ?? "—", symbol: "thermometer.medium")
-                    metric("Physical footprint", value: memoryText, symbol: "memorychip")
-                    metric("Uptime", value: uptimeText, symbol: "clock")
+                Section("デバイス") {
+                    metric("発熱状態", value: appState.metricsSnapshot?.thermalState.capitalized ?? "—", symbol: "thermometer.medium")
+                    metric("メモリ使用量", value: memoryText, symbol: "memorychip")
+                    metric("稼働時間", value: uptimeText, symbol: "clock")
                 }
-                Section("Last inference") {
+                Section("直前の推論") {
                     if let last = appState.metricsSnapshot?.lastInference {
-                        metric("Prompt tokens (estimated)", value: "\(last.promptTokens)", symbol: "text.alignleft")
-                        metric("Generated tokens (estimated)", value: "\(last.generatedTokens)", symbol: "text.alignleft")
-                        metric("Time to first token", value: milliseconds(last.ttftMilliseconds), symbol: "bolt")
-                        metric("Decode speed", value: String(format: "%.2f tok/s", last.decodeTokensPerSecond), symbol: "speedometer")
-                        metric("Total latency", value: milliseconds(last.totalLatencyMilliseconds), symbol: "timer")
+                        metric("入力トークン数（推定）", value: "\(last.promptTokens)", symbol: "text.alignleft")
+                        metric("生成トークン数（推定）", value: "\(last.generatedTokens)", symbol: "text.alignleft")
+                        metric("最初のトークンまでの時間", value: milliseconds(last.ttftMilliseconds), symbol: "bolt")
+                        metric("生成速度", value: String(format: "%.2f tok/s", last.decodeTokensPerSecond), symbol: "speedometer")
+                        metric("合計時間", value: milliseconds(last.totalLatencyMilliseconds), symbol: "timer")
                     } else {
-                        Text("No inference requests yet.").foregroundStyle(.secondary)
+                        Text("まだ推論リクエストはありません。").foregroundStyle(.secondary)
                     }
                     if let load = appState.metricsSnapshot?.modelLoadMilliseconds {
-                        metric("Model load time", value: milliseconds(load), symbol: "shippingbox")
+                        metric("モデルのロード時間", value: milliseconds(load), symbol: "shippingbox")
                     }
                 }
-                Section("Benchmarks") {
+                Section("ベンチマーク") {
                     Button {
                         Task { await appState.runTextBenchmark() }
                     } label: {
-                        Label("Run text benchmark", systemImage: "text.alignleft")
+                        Label("テキストのベンチマークを実行", systemImage: "text.alignleft")
                     }
                     .disabled(appState.benchmarkRunning || appState.modelLoading)
                     Button {
                         Task { await appState.runVisionBenchmark() }
                     } label: {
-                        Label("Run vision benchmark", systemImage: "viewfinder")
+                        Label("画像のベンチマークを実行", systemImage: "viewfinder")
                     }
                     .disabled(!appState.supportsVision || appState.benchmarkRunning || appState.modelLoading)
                     if appState.benchmarkRunning {
                         HStack(spacing: 10) {
                             ProgressView()
-                            Text("Benchmark running…")
+                            Text("ベンチマーク実行中…")
                         }
                     }
-                    Text("Results appear in Last inference and GET /metrics. Vision uses a fixed image with a blue square and a red circle.")
+                    Text("結果は「直前の推論」と GET /metrics に表示されます。画像のベンチマークは、青い四角と赤い円を描いた固定の画像を使います。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-                Section("Latest error") {
-                    Text(appState.lastError ?? "No recent error.")
+                Section("直近のエラー") {
+                    Text(appState.lastError ?? "最近のエラーはありません。")
                         .foregroundStyle(appState.lastError == nil ? Color.gray : Color.red)
                 }
-                Section("Server") {
-                    metric("Requests", value: "\(appState.metricsSnapshot?.requestsTotal ?? 0)", symbol: "arrow.left.arrow.right")
-                    metric("Failed requests", value: "\(appState.metricsSnapshot?.requestsFailed ?? 0)", symbol: "exclamationmark.triangle")
-                    metric("Active requests", value: "\(appState.metricsSnapshot?.activeRequests ?? 0)", symbol: "ellipsis")
+                Section("サーバー") {
+                    metric("リクエスト数", value: "\(appState.metricsSnapshot?.requestsTotal ?? 0)", symbol: "arrow.left.arrow.right")
+                    metric("失敗したリクエスト", value: "\(appState.metricsSnapshot?.requestsFailed ?? 0)", symbol: "exclamationmark.triangle")
+                    metric("実行中のリクエスト", value: "\(appState.metricsSnapshot?.activeRequests ?? 0)", symbol: "ellipsis")
                 }
                 Section { ErrorBanner().listRowInsets(EdgeInsets()) }
             }
-            .navigationTitle("Diagnostics")
+            .navigationTitle("診断")
             .refreshable { await appState.refresh() }
         }
     }
@@ -99,9 +99,9 @@ struct DiagnosticsView: View {
     }
 
     private var logStorageText: String {
-        guard let status = appState.logPersistenceStatus else { return "Checking…" }
-        if !status.enabled { return "In memory only" }
-        return status.healthy ? "Saved on iPhone" : "Save error"
+        guard let status = appState.logPersistenceStatus else { return "確認中…" }
+        if !status.enabled { return "メモリ上のみ" }
+        return status.healthy ? "iPhone に保存" : "保存エラー"
     }
 
     private var uptimeText: String {
