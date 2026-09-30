@@ -34,6 +34,7 @@ actor MetricsService {
     private var requestsTotal = 0
     private var requestsFailed = 0
     private var activeRequests = 0
+    private var lastCountsEstimated = true
 
     func setModel(loaded: Bool, model: String?, backend: String, loadMilliseconds: Double?) {
         modelLoaded = loaded
@@ -52,9 +53,11 @@ actor MetricsService {
         generatedTokens: Int,
         ttftMilliseconds: Double,
         totalLatencyMilliseconds: Double,
-        failed: Bool
+        failed: Bool,
+        countsEstimated: Bool = true
     ) {
         activeRequests = max(0, activeRequests - 1)
+        lastCountsEstimated = countsEstimated
         if failed { requestsFailed += 1 }
         let decodeMilliseconds = max(0, totalLatencyMilliseconds - ttftMilliseconds)
         let speed = decodeMilliseconds > 0 ? Double(generatedTokens) / (decodeMilliseconds / 1000) : 0
@@ -80,7 +83,7 @@ actor MetricsService {
             requestsFailed: requestsFailed,
             activeRequests: activeRequests,
             uptimeSeconds: Date().timeIntervalSince(startedAt),
-            tokenCountsEstimated: true
+            tokenCountsEstimated: lastCountsEstimated
         )
     }
 

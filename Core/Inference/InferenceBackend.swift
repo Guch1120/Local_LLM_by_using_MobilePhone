@@ -12,6 +12,8 @@ struct BackendMetrics: Sendable {
     let modelLoadMilliseconds: Double?
     let computeBackend: String?
     let multiTokenPredictionEnabled: Bool
+    /// Prompt and reply together must fit in this many tokens; nil when no model is loaded.
+    var contextTokens: Int?
 }
 
 protocol InferenceBackend: Sendable {

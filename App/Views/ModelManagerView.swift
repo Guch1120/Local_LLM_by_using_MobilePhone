@@ -12,17 +12,7 @@ struct ModelManagerView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Button { showingBrowser = true } label: {
-                        Label("Hugging Face で探す", systemImage: "magnifyingglass")
-                    }
-                    Text("GGUF / LiteRT-LM モデルを検索して、この iPhone に直接ダウンロードします。")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } header: { Text("モデルを入手") }
-
-                ModelDownloadsSection()
-
+                // The tab is opened mostly to pick a model to load, so the installed models come first.
                 Section {
                     if appState.modelImporting {
                         HStack(spacing: 10) {
@@ -38,35 +28,24 @@ struct ModelManagerView: View {
                                 .font(.footnote)
                         }
                     }
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("開発用モックバックエンド")
-                                .font(.headline)
-                            Text("モデルファイルは不要です。API は決まったテスト用の文章を返します。")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if appState.metricsSnapshot?.model == "mock-echo" {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                        }
-                    }
-                    if appState.metricsSnapshot?.model != "mock-echo" {
-                        Button("使用中のモデルをアンロード") { Task { await appState.unloadModel() } }
-                            .disabled(appState.modelLoading)
-                    }
-                } header: { Text("内蔵バックエンド") }
-
-                Section {
                     if appState.installedModels.isEmpty {
-                        ContentUnavailableView("モデルがありません", systemImage: "shippingbox", description: Text(".litertlm または .gguf ファイルを取り込むと、この端末に登録されます。"))
-                            .listRowBackground(Color.clear)
+                        ContentUnavailableView(
+                            "モデルがありません",
+                            systemImage: "shippingbox",
+                            description: Text(
+                                "右上の「HFでモデルを探す」からダウンロードするか、"
+                                    + ".litertlm / .gguf ファイルを取り込んでください。"
+                            )
+                        )
+                        .listRowBackground(Color.clear)
                     } else {
                         ForEach(appState.installedModels) { model in
                             modelRow(model)
                         }
                     }
                 } header: { Text("インストール済みモデル") }
+
+                ModelDownloadsSection()
 
                 Section {
                     Button { showingImporter = true } label: {
@@ -87,10 +66,41 @@ struct ModelManagerView: View {
                     )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                }
+                } header: { Text("ローカルストレージから取り込み") }
+
+                // A development aid that is rarely used, so it sits at the bottom.
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("開発用モックバックエンド")
+                                .font(.headline)
+                            Text("モデルファイルは不要です。API は決まったテスト用の文章を返します。")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if appState.metricsSnapshot?.model == "mock-echo" {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        }
+                    }
+                    if appState.metricsSnapshot?.model != "mock-echo" {
+                        Button("使用中のモデルをアンロード") { Task { await appState.unloadModel() } }
+                            .disabled(appState.modelLoading)
+                    }
+                } header: { Text("内蔵バックエンド") }
+
                 Section { ErrorBanner().listRowInsets(EdgeInsets()) }
             }
             .navigationTitle("モデル管理")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingBrowser = true } label: {
+                        Label("HFでモデルを探す", systemImage: "magnifyingglass")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .accessibilityLabel("Hugging Face でモデルを探す")
+                }
+            }
             .navigationDestination(isPresented: $showingBrowser) {
                 HuggingFaceBrowserView(
                     initialQuery: UserDefaults.standard.string(forKey: "modelBrowserQuery") ?? "",

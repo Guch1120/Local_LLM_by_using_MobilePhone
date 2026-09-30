@@ -308,7 +308,8 @@ final class HTTPServer {
                 "backend": active.backend,
                 "model": jsonValue(active.id),
                 "modalities": ["text": backend.text, "image": backend.image, "audio": backend.audio, "camera": false],
-                "features": ["streaming": backend.streaming, "tools": false, "usb_forwarding": true, "mtp": backendMetrics.multiTokenPredictionEnabled]
+                "features": ["streaming": backend.streaming, "tools": false, "usb_forwarding": true, "mtp": backendMetrics.multiTokenPredictionEnabled],
+                "context_tokens": jsonValue(backendMetrics.contextTokens)
             ]
             await session.sendJSON(response, status: 200)
         case ("GET", "/metrics"):
@@ -405,6 +406,12 @@ final class HTTPServer {
                     if let finishReason = chunk.finishReason {
                         try await session.sendEvent(completionChunk(requestID: request.id, created: created, model: request.model, delta: [:], finishReason: finishReason))
                     }
+                    if adapted.includeUsage, let usage = chunk.usage {
+                        var usageChunk = completionChunk(requestID: request.id, created: created, model: request.model, delta: [:], finishReason: NSNull())
+                        usageChunk["choices"] = [[String: Any]]()
+                        usageChunk["usage"] = usagePayload(usage)
+                        try await session.sendEvent(usageChunk)
+                    }
                 }
                 try await session.sendDone()
             } catch {
@@ -416,18 +423,23 @@ final class HTTPServer {
 
         var content = ""
         var finishReason = "stop"
+        var exactUsage: TokenUsage?
         do {
             for try await chunk in stream {
                 content += chunk.text
                 if let reason = chunk.finishReason { finishReason = reason }
+                if let usage = chunk.usage { exactUsage = usage }
             }
         } catch {
             let mapped = map(error)
             await sendError(type: mapped.type, message: mapped.message, requestID: request.id, status: mapped.status, on: session)
             return
         }
-        let promptTokenCount = estimatedTokenCount(request.messages)
-        let completionTokenCount = max(1, content.split(whereSeparator: \.isWhitespace).count)
+        // Backends that can tokenize report exact counts; the others get a word-count estimate.
+        let usage = exactUsage ?? TokenUsage(
+            promptTokens: estimatedTokenCount(request.messages),
+            completionTokens: max(1, content.split(whereSeparator: \.isWhitespace).count)
+        )
         let response: [String: Any] = [
             "id": "chatcmpl-\(request.id)",
             "object": "chat.completion",
@@ -438,11 +450,7 @@ final class HTTPServer {
                 "message": ["role": "assistant", "content": content],
                 "finish_reason": finishReason
             ]],
-            "usage": [
-                "prompt_tokens": promptTokenCount,
-                "completion_tokens": completionTokenCount,
-                "total_tokens": promptTokenCount + completionTokenCount
-            ]
+            "usage": usagePayload(usage)
         ]
         await session.sendJSON(response, status: 200)
     }
@@ -461,6 +469,7 @@ final class HTTPServer {
         response["backend_runtime"] = jsonValue(backendMetrics.computeBackend)
         response["model_load_milliseconds"] = jsonValue(backendMetrics.modelLoadMilliseconds)
         response["multi_token_prediction_enabled"] = backendMetrics.multiTokenPredictionEnabled
+        response["context_tokens"] = jsonValue(backendMetrics.contextTokens)
         return response
     }
 
@@ -475,6 +484,14 @@ final class HTTPServer {
             "created": created,
             "model": model,
             "choices": [["index": 0, "delta": delta, "finish_reason": finishReason]]
+        ]
+    }
+
+    private func usagePayload(_ usage: TokenUsage) -> [String: Any] {
+        [
+            "prompt_tokens": usage.promptTokens,
+            "completion_tokens": usage.completionTokens,
+            "total_tokens": usage.totalTokens
         ]
     }
 

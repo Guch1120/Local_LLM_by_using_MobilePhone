@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MainTabView: View {
     // The `-initialTab models` launch argument opens a tab directly (see scripts/iphone/launch.sh).
@@ -46,5 +47,24 @@ struct ErrorBanner: View {
             .padding(12)
             .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
         }
+    }
+}
+
+extension View {
+    /// Lets the keyboard be closed on screens with text input. iOS has no hide-keyboard key:
+    /// the 完了 button above the keyboard works for every field (the number pad has no return
+    /// key), and dragging the list down dismisses it too.
+    func keyboardDismissible() -> some View {
+        scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") {
+                        UIApplication.shared.sendAction(
+                            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+                        )
+                    }
+                }
+            }
     }
 }

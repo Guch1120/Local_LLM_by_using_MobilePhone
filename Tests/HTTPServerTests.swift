@@ -22,6 +22,8 @@ final class HTTPServerTests: XCTestCase {
         XCTAssertEqual(capabilities.status, 200)
         let capabilitiesBody = try XCTUnwrap(capabilities.jsonBody as? [String: Any])
         XCTAssertEqual(capabilitiesBody["server"] as? String, "iphone-local-ai")
+        // The mock backend has no context window; the key is present for clients that budget prompts.
+        XCTAssertTrue(capabilitiesBody.keys.contains("context_tokens"))
         let features = try XCTUnwrap(capabilitiesBody["features"] as? [String: Any])
         XCTAssertEqual(features["usb_forwarding"] as? Bool, true)
 

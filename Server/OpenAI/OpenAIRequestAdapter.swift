@@ -15,6 +15,8 @@ enum RequestValidationError: Error, LocalizedError {
 struct AdaptedChatRequest {
     let inferenceRequest: InferenceRequest
     let stream: Bool
+    /// `stream_options.include_usage`: send a final streaming chunk that carries token usage.
+    var includeUsage = false
 }
 
 enum OpenAIRequestAdapter {
@@ -75,7 +77,8 @@ enum OpenAIRequestAdapter {
                 maxTokens: maxTokens,
                 temperature: temperature
             ),
-            stream: input.stream ?? false
+            stream: input.stream ?? false,
+            includeUsage: input.streamOptions?.includeUsage ?? false
         )
     }
 
@@ -131,11 +134,21 @@ private struct OpenAIChatRequest: Decodable {
     let maxTokens: Int?
     let maxCompletionTokens: Int?
     let temperature: Double?
+    let streamOptions: OpenAIStreamOptions?
 
     enum CodingKeys: String, CodingKey {
         case model, messages, stream, temperature
         case maxTokens = "max_tokens"
         case maxCompletionTokens = "max_completion_tokens"
+        case streamOptions = "stream_options"
+    }
+}
+
+private struct OpenAIStreamOptions: Decodable {
+    let includeUsage: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case includeUsage = "include_usage"
     }
 }
 

@@ -45,13 +45,23 @@ struct InferenceRequest: Sendable {
     let temperature: Double
 }
 
+/// Token counts measured by the backend's tokenizer (images count as the tokens they expand to).
+struct TokenUsage: Sendable, Equatable {
+    let promptTokens: Int
+    let completionTokens: Int
+    var totalTokens: Int { promptTokens + completionTokens }
+}
+
 struct InferenceChunk: Sendable {
     let text: String
     let finishReason: String?
+    /// Set on the final chunk by backends that can count tokens exactly.
+    let usage: TokenUsage?
 
-    init(text: String, finishReason: String? = nil) {
+    init(text: String, finishReason: String? = nil, usage: TokenUsage? = nil) {
         self.text = text
         self.finishReason = finishReason
+        self.usage = usage
     }
 }
 

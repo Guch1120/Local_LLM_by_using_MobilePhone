@@ -253,8 +253,10 @@ final class AppState: ObservableObject {
 
         let previousContext = self.contextTokens
         let active = await inference.activeModel()
-        let shouldReloadModel = (previousContext != contextTokens || self.multiTokenPredictionEnabled != multiTokenPredictionEnabled)
-            && active.loaded && active.backend == "litert-lm"
+        // The context size is fixed when a model loads, for both real backends. MTP only exists in LiteRT-LM.
+        let contextChanged = previousContext != contextTokens
+        let mtpChanged = self.multiTokenPredictionEnabled != multiTokenPredictionEnabled && active.backend == "litert-lm"
+        let shouldReloadModel = (contextChanged || mtpChanged) && active.loaded && active.backend != "mock"
         let shouldRestart = server != nil
         if shouldRestart { await stopServer() }
 

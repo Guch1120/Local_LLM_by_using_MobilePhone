@@ -71,6 +71,7 @@ struct HuggingFaceBrowserView: View {
         .navigationTitle("Hugging Face")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "モデルを検索")
+        .keyboardDismissible()
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
         .onSubmit(of: .search) { Task { await search() } }

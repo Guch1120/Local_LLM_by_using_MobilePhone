@@ -123,6 +123,7 @@ actor InferenceService {
             let task = Task {
                 var firstTokenAt: Date?
                 var generatedTokens = 0
+                var exactUsage: TokenUsage?
                 var failed = false
                 var truncated = false
                 do {
@@ -133,6 +134,7 @@ actor InferenceService {
                             observer?(.text(requestID: request.id, chunk.text))
                         }
                         if chunk.finishReason == "length" { truncated = true }
+                        if let usage = chunk.usage { exactUsage = usage }
                         continuation.yield(chunk)
                     }
                     continuation.finish()
@@ -145,12 +147,13 @@ actor InferenceService {
                 let ttft = firstTokenAt.map { $0.timeIntervalSince(generationStartedAt) * 1000 } ?? latency
                 await self.finishGeneration(
                     requestID: request.id,
-                    promptTokens: promptTokens,
-                    generatedTokens: generatedTokens,
+                    promptTokens: exactUsage?.promptTokens ?? promptTokens,
+                    generatedTokens: exactUsage?.completionTokens ?? generatedTokens,
                     ttftMilliseconds: ttft,
                     totalLatencyMilliseconds: latency,
                     failed: failed,
-                    truncated: truncated
+                    truncated: truncated,
+                    countsEstimated: exactUsage == nil
                 )
             }
             continuation.onTermination = { _ in task.cancel() }
@@ -174,7 +177,8 @@ actor InferenceService {
         ttftMilliseconds: Double,
         totalLatencyMilliseconds: Double,
         failed: Bool,
-        truncated: Bool = false
+        truncated: Bool = false,
+        countsEstimated: Bool = true
     ) async {
         generationInProgress = false
         observer?(.finished(requestID: requestID, failed: failed, truncated: truncated))
@@ -183,7 +187,8 @@ actor InferenceService {
             generatedTokens: generatedTokens,
             ttftMilliseconds: ttftMilliseconds,
             totalLatencyMilliseconds: totalLatencyMilliseconds,
-            failed: failed
+            failed: failed,
+            countsEstimated: countsEstimated
         )
         await logs.write(
             failed ? .error : .info,

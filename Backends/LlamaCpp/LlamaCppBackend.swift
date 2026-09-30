@@ -47,11 +47,15 @@ actor LlamaCppBackend: InferenceBackend {
         return AsyncThrowingStream { continuation in
             let task = Task.detached(priority: .userInitiated) {
                 do {
-                    let reachedLimit = try runtime.generate(request: request) { text in
+                    let result = try runtime.generate(request: request) { text in
                         continuation.yield(InferenceChunk(text: text))
                         return !Task.isCancelled
                     }
-                    continuation.yield(InferenceChunk(text: "", finishReason: reachedLimit ? "length" : "stop"))
+                    continuation.yield(InferenceChunk(
+                        text: "",
+                        finishReason: result.reachedLimit ? "length" : "stop",
+                        usage: TokenUsage(promptTokens: result.promptTokens, completionTokens: result.completionTokens)
+                    ))
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -70,7 +74,8 @@ actor LlamaCppBackend: InferenceBackend {
             loadedModel: loadedModel,
             modelLoadMilliseconds: modelLoadMilliseconds,
             computeBackend: runtime == nil ? nil : "metal",
-            multiTokenPredictionEnabled: false
+            multiTokenPredictionEnabled: false,
+            contextTokens: runtime?.contextSize
         )
     }
 }
@@ -169,7 +174,7 @@ final class LlamaRuntime: @unchecked Sendable {
     private let vocab: OpaquePointer
     private let multimodal: OpaquePointer?
     private let batchSize: Int32
-    private let contextSize: Int
+    let contextSize: Int
     private let chatTemplate: String?
     private let usesGemma4Template: Bool
 
@@ -243,9 +248,15 @@ final class LlamaRuntime: @unchecked Sendable {
         llama_model_free(model)
     }
 
+    struct GenerationResult {
+        /// True when the output was cut off by the token limit instead of ending by itself.
+        let reachedLimit: Bool
+        let promptTokens: Int
+        let completionTokens: Int
+    }
+
     /// Runs one completion. `emit` receives decoded text and returns false to stop early.
-    /// Returns true when the output was cut off by the token limit instead of ending by itself.
-    func generate(request: InferenceRequest, emit: (String) -> Bool) throws -> Bool {
+    func generate(request: InferenceRequest, emit: (String) -> Bool) throws -> GenerationResult {
         llama_memory_clear(llama_get_memory(context), true)
         let (prompt, images) = formatPrompt(request.messages)
 
@@ -261,19 +272,24 @@ final class LlamaRuntime: @unchecked Sendable {
         var decoder = UTF8StreamDecoder()
         let budget = min(request.maxTokens, contextSize - Int(nPast))
         var reachedLimit = true
+        var generated = 0
+        let promptTokens = Int(nPast)
         for _ in 0..<max(0, budget) {
             let token = llama_sampler_sample(sampler, context, -1)
             if llama_vocab_is_eog(vocab, token) {
                 reachedLimit = false
                 break
             }
-            if let text = decoder.append(piece(for: token)), !text.isEmpty, !emit(text) { return false }
+            generated += 1
+            if let text = decoder.append(piece(for: token)), !text.isEmpty, !emit(text) {
+                return GenerationResult(reachedLimit: false, promptTokens: promptTokens, completionTokens: generated)
+            }
             var next = token
             let status = llama_decode(context, llama_batch_get_one(&next, 1))
             if status != 0 { throw LlamaError.decodeFailed(status) }
         }
         if let rest = decoder.flush(), !rest.isEmpty { _ = emit(rest) }
-        return reachedLimit
+        return GenerationResult(reachedLimit: reachedLimit, promptTokens: promptTokens, completionTokens: generated)
     }
 
     private var mediaMarker: String {

@@ -11,7 +11,6 @@ struct SettingsView: View {
     @State private var revealKey = false
     @State private var copied = false
     @State private var huggingFaceToken = ""
-    @FocusState private var numberFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -20,7 +19,6 @@ struct SettingsView: View {
                     HStack {
                         TextField("ポート", text: $portText)
                             .keyboardType(.numberPad)
-                            .focused($numberFieldFocused)
                             .textFieldStyle(.roundedBorder)
                         Button("適用") {
                             if let value = Int(portText) { Task { await appState.applyPort(value) } }
@@ -43,7 +41,6 @@ struct SettingsView: View {
                         TextField("1〜\(String(contextTokens))", value: $maxTokens, format: .number.grouping(.never))
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
-                            .focused($numberFieldFocused)
                             .frame(maxWidth: 110)
                     }
                     Stepper("128 ずつ増減", value: $maxTokens, in: 1...contextTokens, step: 128)
@@ -74,7 +71,7 @@ struct SettingsView: View {
                     }
                     .disabled(!(1...contextTokens).contains(maxTokens))
                     Toggle("Multi-Token Prediction（実験的）", isOn: $multiTokenPredictionEnabled)
-                    Text("これらは既定値です。OpenAI 形式のリクエストで出力トークン数と temperature を上書きできます。コンテキスト上限または MTP を変えると、ロード中の LiteRT モデルを再ロードします。")
+                    Text("これらは既定値です。OpenAI 形式のリクエストで出力トークン数と temperature を上書きできます。コンテキスト上限を変えると、ロード中のモデルを再ロードします（MTP は LiteRT モデルのみ）。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -149,13 +146,7 @@ struct SettingsView: View {
                 Section { ErrorBanner().listRowInsets(EdgeInsets()) }
             }
             .navigationTitle("設定")
-            .toolbar {
-                // The number pad has no return key.
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("完了") { numberFieldFocused = false }
-                }
-            }
+            .keyboardDismissible()
             .onAppear {
                 portText = String(appState.port)
                 maxTokens = appState.defaultMaxTokens

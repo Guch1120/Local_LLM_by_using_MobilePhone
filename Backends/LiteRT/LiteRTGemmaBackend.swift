@@ -7,6 +7,7 @@ actor LiteRTGemmaBackend: InferenceBackend {
     private var engine: Engine?
     private var loadedModel: String?
     private var modelLoadMilliseconds: Double?
+    private var contextTokens: Int?
     private var selectedBackend = "gpu"
     private var visionBackend: String?
     private var multiTokenPredictionEnabled = false
@@ -44,6 +45,7 @@ actor LiteRTGemmaBackend: InferenceBackend {
                 visionBackend = attempt.vision?.rawValue
                 multiTokenPredictionEnabled = mtp
                 loadedModel = configuration.id
+                contextTokens = configuration.contextTokens
                 modelLoadMilliseconds = Date().timeIntervalSince(start) * 1000
                 return
             } catch {
@@ -75,6 +77,7 @@ actor LiteRTGemmaBackend: InferenceBackend {
 
     func unloadModel() async {
         engine = nil
+        contextTokens = nil
         loadedModel = nil
         visionBackend = nil
         modelLoadMilliseconds = nil
@@ -128,7 +131,7 @@ actor LiteRTGemmaBackend: InferenceBackend {
     }
 
     func metrics() async -> BackendMetrics {
-        BackendMetrics(loadedModel: loadedModel, modelLoadMilliseconds: modelLoadMilliseconds, computeBackend: selectedBackend, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
+        BackendMetrics(loadedModel: loadedModel, modelLoadMilliseconds: modelLoadMilliseconds, computeBackend: selectedBackend, multiTokenPredictionEnabled: multiTokenPredictionEnabled, contextTokens: contextTokens)
     }
 
     private static func convertMessage(_ message: InferenceMessage) -> Message {

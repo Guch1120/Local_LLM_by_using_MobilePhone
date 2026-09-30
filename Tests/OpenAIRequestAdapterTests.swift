@@ -17,6 +17,14 @@ final class OpenAIRequestAdapterTests: XCTestCase {
         XCTAssertEqual(text, "Hello from the PC")
     }
 
+    func testStreamOptionsRequestUsageChunk() throws {
+        let plain = #"{"model":"mock-echo","stream":true,"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertFalse(try OpenAIRequestAdapter.adapt(Data(plain.utf8)).includeUsage)
+
+        let withUsage = #"{"model":"mock-echo","stream":true,"stream_options":{"include_usage":true},"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertTrue(try OpenAIRequestAdapter.adapt(Data(withUsage.utf8)).includeUsage)
+    }
+
     func testAppliesSavedGenerationDefaultsAndContextLimit() throws {
         let json = #"{"model":"mock-echo","messages":[{"role":"user","content":"hello"}]}"#
         let defaults = InferenceDefaults(maxTokens: 120, temperature: 0.4, contextTokens: 512)
