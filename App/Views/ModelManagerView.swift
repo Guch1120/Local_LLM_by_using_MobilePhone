@@ -65,7 +65,11 @@ struct ModelManagerView: View {
                     Text("Files are copied to Application Support and hashed locally. Model downloads are not performed by this app.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Text(".litertlm and .gguf files placed in this app's Documents folder (Files app or USB) are moved in automatically when the app opens. A GGUF file named mmproj is attached to the most recently imported GGUF model for image input.")
+                    Text(
+                        ".litertlm and .gguf files placed in this app's Documents folder (Files app or USB) "
+                            + "are moved in automatically when the app opens. A GGUF file named mmproj is attached "
+                            + "to the most recently imported GGUF model for image input."
+                    )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
