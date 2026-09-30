@@ -20,6 +20,10 @@ struct ModelDownload: Identifiable, Sendable, Equatable {
     var error: String?
     /// ID of the installed model once the file has been imported.
     var modelID: String?
+    /// For an image projector downloaded together with a model: that model's download.
+    var modelDownloadID: UUID?
+    /// For an image projector added to a model that is already installed: that model's ID.
+    var projectorTargetID: String?
 
     var fileName: String { (path as NSString).lastPathComponent }
     var fraction: Double { totalBytes > 0 ? min(1, Double(receivedBytes) / Double(totalBytes)) : 0 }
@@ -58,8 +62,9 @@ final class ModelDownloader: NSObject {
     }
 
     var onChange: (@MainActor ([ModelDownload]) -> Void)?
-    /// Imports a finished file and returns the ID of the installed model.
-    var importer: (@MainActor (URL) async throws -> String)?
+    /// Imports a finished file and returns the ID of the installed model. The second argument is
+    /// the model a projector belongs to, when it was downloaded together with one.
+    var importer: (@MainActor (URL, _ projectorTarget: String?) async throws -> String)?
     var tokenProvider: @MainActor () -> String? = { nil }
 
     private var tasks: [UUID: URLSessionDownloadTask] = [:]
@@ -74,7 +79,10 @@ final class ModelDownloader: NSObject {
 
     /// Queues a file. Asking again for a file that is already queued or running returns that entry.
     @discardableResult
-    func enqueue(repository: String, revision: String = "main", path: String, sizeBytes: Int64) throws -> ModelDownload {
+    func enqueue(
+        repository: String, revision: String = "main", path: String, sizeBytes: Int64,
+        modelDownloadID: UUID? = nil, projectorTargetID: String? = nil
+    ) throws -> ModelDownload {
         guard HuggingFaceClient.downloadURL(repository: repository, revision: revision, path: path) != nil else {
             throw HuggingFaceError.invalidRepository
         }
@@ -88,7 +96,8 @@ final class ModelDownloader: NSObject {
         downloads.removeAll { $0.repository == repository && $0.path == path }
         let download = ModelDownload(
             id: UUID(), repository: repository, revision: revision, path: path,
-            state: .queued, receivedBytes: 0, totalBytes: sizeBytes
+            state: .queued, receivedBytes: 0, totalBytes: sizeBytes,
+            modelDownloadID: modelDownloadID, projectorTargetID: projectorTargetID
         )
         downloads.append(download)
         startNextIfIdle()
@@ -170,13 +179,24 @@ final class ModelDownloader: NSObject {
             }
             do {
                 guard let importer else { throw ModelDownloadError.importUnavailable }
-                let modelID = try await importer(url)
+                let modelID = try await importer(url, try projectorTarget(of: id))
                 update(id) { $0.state = .completed; $0.modelID = modelID }
             } catch {
                 update(id) { $0.state = .failed; $0.error = error.localizedDescription }
             }
         }
         startNextIfIdle()
+    }
+
+    /// The installed model a projector was downloaded for; nil for other downloads.
+    private func projectorTarget(of id: UUID) throws -> String? {
+        let download = downloads.first { $0.id == id }
+        if let target = download?.projectorTargetID { return target }
+        guard let modelDownloadID = download?.modelDownloadID else { return nil }
+        guard let modelID = downloads.first(where: { $0.id == modelDownloadID })?.modelID else {
+            throw ModelImportError.projectorTargetMissing
+        }
+        return modelID
     }
 
     private func fail(_ id: UUID, error: Error, resumeData data: Data?) {

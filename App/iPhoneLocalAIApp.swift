@@ -5,6 +5,10 @@ struct IPhoneLocalAIApp: App {
     @StateObject private var appState = AppState()
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        StandardOutputGuard.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             MainTabView()

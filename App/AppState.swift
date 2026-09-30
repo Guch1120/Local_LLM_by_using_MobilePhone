@@ -81,9 +81,9 @@ final class AppState: ObservableObject {
         hasHuggingFaceToken = huggingFaceTokenStore.load() != nil
         downloader.onChange = { [weak self] in self?.downloads = $0 }
         downloader.tokenProvider = { [huggingFaceTokenStore] in huggingFaceTokenStore.load() }
-        downloader.importer = { [weak self] url in
+        downloader.importer = { [weak self] url, projectorTarget in
             guard let self else { throw CancellationError() }
-            return try await self.importDownloadedModel(at: url)
+            return try await self.importDownloadedModel(at: url, projectorTarget: projectorTarget)
         }
     }
 
@@ -421,6 +421,7 @@ extension AppState {
             return
         }
         var stage = "verify"
+        await logs.write(.info, event: "model_verifying", details: "model=\(id)")
         do {
             guard try await modelManager.verifyModel(id: id) else {
                 throw InferenceError.backendUnavailable("The model file is missing or its SHA-256 no longer matches the registry.")
@@ -491,12 +492,35 @@ extension AppState {
 extension AppState {
     var huggingFaceClient: HuggingFaceClient { HuggingFaceClient(token: huggingFaceTokenStore.load()) }
 
-    /// Starts a download chosen in the model browser.
-    func startDownload(repository: String, file: HuggingFaceFile) {
+    /// Starts a download chosen in the model browser. With `projector`, the image projector is
+    /// downloaded after the model and attached to it.
+    func startDownload(repository: String, file: HuggingFaceFile, projector: HuggingFaceFile? = nil) {
         do {
-            try downloader.enqueue(repository: repository, path: file.path, sizeBytes: file.sizeBytes)
+            let model = try downloader.enqueue(repository: repository, path: file.path, sizeBytes: file.sizeBytes)
+            var details = "repository=\(repository) file=\(file.path)"
+            if let projector {
+                try downloader.enqueue(
+                    repository: repository, path: projector.path, sizeBytes: projector.sizeBytes,
+                    modelDownloadID: model.id
+                )
+                details += " projector=\(projector.path)"
+            }
             lastError = nil
-            let details = "repository=\(repository) file=\(file.path)"
+            Task { [details] in await logs.write(.info, event: "model_download_started", details: details) }
+        } catch {
+            lastError = "The download could not start: \(error.localizedDescription)"
+        }
+    }
+
+    /// Downloads an image projector for a model that is already installed.
+    func startProjectorDownload(repository: String, projector: HuggingFaceFile, modelID: String) {
+        do {
+            try downloader.enqueue(
+                repository: repository, path: projector.path, sizeBytes: projector.sizeBytes,
+                projectorTargetID: modelID
+            )
+            lastError = nil
+            let details = "repository=\(repository) projector=\(projector.path) model=\(modelID)"
             Task { await logs.write(.info, event: "model_download_started", details: details) }
         } catch {
             lastError = "The download could not start: \(error.localizedDescription)"
@@ -530,8 +554,8 @@ extension AppState {
         }
     }
 
-    private func importDownloadedModel(at url: URL) async throws -> String {
-        let model = try await modelManager.importModel(from: url, moveSource: true)
+    private func importDownloadedModel(at url: URL, projectorTarget: String?) async throws -> String {
+        let model = try await modelManager.importModel(from: url, moveSource: true, projectorTarget: projectorTarget)
         await logs.write(.info, event: "model_downloaded", details: "model=\(model.id)")
         await refresh()
         return model.id

@@ -9,7 +9,7 @@ Use an iPhone as a local text and vision inference server for an Ubuntu PC. The 
 - SwiftUI status, model, settings, diagnostics, and log screens.
 - An `InferenceBackend` protocol between HTTP adapters and inference implementations.
 - Install models after app installation; store imports in Application Support and verify SHA-256.
-- A model browser in the Models tab searches Hugging Face, lists the `.gguf` / `.litertlm` files of a repository with a memory-fit hint, and downloads the chosen files to the phone.
+- A model browser in the Models tab searches Hugging Face by name, format and use (text, or image + text), lists the `.gguf` / `.litertlm` files of a repository with a memory-fit hint, and downloads the chosen files to the phone. A GGUF model can be downloaded together with its image projector (mmproj), which is then attached to that model.
 - OpenAI-compatible `GET /v1/models` and `POST /v1/chat/completions`, including text, JPEG/PNG base64 data URLs, and SSE streaming.
 - Authenticated management routes: `/capabilities`, `/metrics`, and `/logs`; `/health` reports basic liveness.
 - Keychain-backed bearer token, foreground HTTP server, memory and thermal diagnostics, request timing, and privacy-preserving ring-buffer logs.
@@ -32,7 +32,8 @@ The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, 
 - The last successfully loaded model is loaded again automatically when the app starts. If the app was terminated during that automatic load, the next launch skips it once.
 - Image payloads are limited to JPEG/PNG and 12 MiB before normalization to a 2048-pixel maximum edge JPEG.
 - `.gguf` models run on the llama.cpp backend (Metal). A GGUF file whose name contains `mmproj` is stored as the multimodal projector of the most recently imported GGUF model and enables image input through libmtmd. Gemma 4 models (`general.architecture = gemma4`) are prompted with the Gemma 4 chat template (`<|turn>role ... <turn|>`); other models use the chat template stored in the GGUF file through llama.cpp's built-in template support, falling back to ChatML when the template is not recognized.
-- When a llama.cpp model fails to load, the error message and the `model_load_failed` log entry include llama.cpp's last warnings and errors.
+- When a llama.cpp model fails to load, the error message and the `model_load_failed` log entry include llama.cpp's last warnings and errors. A load logs `model_verifying`, `model_unloading_previous`, `model_backend_loading` and `model_loaded` in turn, so a load that never returns shows where it stopped.
+- stdout and stderr never block the app: when it was started from a PC and nothing reads its output any more, the output is dropped. llama.cpp debug messages, which contain the prompt text, are not written to stderr.
 - LiteRT-LM models are text-only by default; use a GGUF model with an mmproj file for images. With LiteRT-LM 0.17.1 the GPU vision encoder always fails on iOS, and each failed attempt leaves address space behind that later model loads need, while the CPU vision encoder can hang indefinitely (LiteRT-LM issues #2979, #2370). At load time the backend tries GPU text, then CPU text. Launch with `LITERT_VISION_BACKEND=gpu` (GPU vision first) or `cpu` to experiment; `/capabilities` reports whether images are enabled.
 - The app is signed with the Extended Virtual Addressing and Increased Memory Limit entitlements (`App/iPhoneLocalAI.entitlements`). Without the larger address space, memory-mapping a multi-gigabyte model fails (`mmap failed: Cannot allocate memory`) once another model has been loaded and unloaded in the same process.
 - Model context length and Multi-Token Prediction are configurable; MTP is reported from the active LiteRT backend.

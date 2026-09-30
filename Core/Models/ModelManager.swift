@@ -37,6 +37,7 @@ struct InstalledModel: Codable, Identifiable, Sendable {
 enum ModelImportError: Error, LocalizedError {
     case unsupportedFile
     case projectorWithoutModel
+    case projectorTargetMissing
 
     var errorDescription: String? {
         switch self {
@@ -44,6 +45,8 @@ enum ModelImportError: Error, LocalizedError {
             return "Only .litertlm or .gguf model files can be imported."
         case .projectorWithoutModel:
             return "Import the GGUF model before its mmproj projector file."
+        case .projectorTargetMissing:
+            return "The model this image projector belongs to is not installed."
         }
     }
 }
@@ -103,13 +106,17 @@ actor ModelManager {
             }
     }
 
-    func importModel(from sourceURL: URL, moveSource: Bool = false) throws -> InstalledModel {
+    /// - Parameter projectorTarget: ID of the GGUF model a projector file belongs to. Without it a
+    ///   projector attaches to the most recently imported GGUF model.
+    func importModel(
+        from sourceURL: URL, moveSource: Bool = false, projectorTarget: String? = nil
+    ) throws -> InstalledModel {
         let fileExtension = sourceURL.pathExtension.lowercased()
         guard Self.supportedExtensions.contains(fileExtension) else {
             throw ModelImportError.unsupportedFile
         }
         if Self.isProjector(sourceURL) {
-            return try importProjector(from: sourceURL, moveSource: moveSource)
+            return try importProjector(from: sourceURL, moveSource: moveSource, targetID: projectorTarget)
         }
         let didAccess = sourceURL.startAccessingSecurityScopedResource()
         defer { if didAccess { sourceURL.stopAccessingSecurityScopedResource() } }
@@ -177,12 +184,20 @@ actor ModelManager {
         return model
     }
 
-    /// Attaches a projector to the most recently imported GGUF model.
-    private func importProjector(from sourceURL: URL, moveSource: Bool) throws -> InstalledModel {
-        guard let index = installedModels.indices
-            .filter({ installedModels[$0].backend == "llama.cpp" })
-            .max(by: { installedModels[$0].importedAt < installedModels[$1].importedAt })
-        else { throw ModelImportError.projectorWithoutModel }
+    /// Attaches a projector to the model `targetID`, or to the most recently imported GGUF model.
+    private func importProjector(from sourceURL: URL, moveSource: Bool, targetID: String?) throws -> InstalledModel {
+        let candidates = installedModels.indices.filter { installedModels[$0].backend == "llama.cpp" }
+        let index: Int
+        if let targetID {
+            guard let match = candidates.first(where: { installedModels[$0].id == targetID }) else {
+                throw ModelImportError.projectorTargetMissing
+            }
+            index = match
+        } else {
+            guard let latest = candidates.max(by: { installedModels[$0].importedAt < installedModels[$1].importedAt })
+            else { throw ModelImportError.projectorWithoutModel }
+            index = latest
+        }
         let didAccess = sourceURL.startAccessingSecurityScopedResource()
         defer { if didAccess { sourceURL.stopAccessingSecurityScopedResource() } }
 

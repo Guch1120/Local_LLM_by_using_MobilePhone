@@ -115,12 +115,11 @@ enum LlamaLogCapture {
     private static var pendingLevel = GGML_LOG_LEVEL_NONE
     private static let capacity = 8
 
-    /// Routes llama.cpp and mtmd logging through the capture. Output still goes to stderr.
+    /// Routes llama.cpp and mtmd logging through the capture.
     static let install: Void = {
         let callback: ggml_log_callback = { level, text, _ in
             guard let text else { return }
-            fputs(text, stderr)
-            LlamaLogCapture.record(level: level, text: String(cString: text))
+            LlamaLogCapture.handle(level: level, text: text)
         }
         llama_log_set(callback, nil)
         mtmd_helper_log_set(callback, nil)
@@ -140,15 +139,19 @@ enum LlamaLogCapture {
         return lines.isEmpty ? nil : String(lines.suffix(3).joined(separator: " | ").prefix(600))
     }
 
-    private static func record(level: ggml_log_level, text: String) {
+    private static func handle(level: ggml_log_level, text: UnsafePointer<CChar>) {
         lock.lock()
         defer { lock.unlock() }
         // GGML_LOG_LEVEL_CONT continues the previous message and keeps its level.
         if level.rawValue != GGML_LOG_LEVEL_CONT.rawValue { pendingLevel = level }
+        // Debug messages include the prompt text, which must stay out of logs; everything else
+        // still goes to stderr.
+        guard pendingLevel.rawValue != GGML_LOG_LEVEL_DEBUG.rawValue else { return }
+        fputs(text, stderr)
         let keep = pendingLevel.rawValue == GGML_LOG_LEVEL_WARN.rawValue
             || pendingLevel.rawValue == GGML_LOG_LEVEL_ERROR.rawValue
         guard keep else { return }
-        pending += text
+        pending += String(cString: text)
         while let newline = pending.firstIndex(of: "\n") {
             let line = pending[..<newline].trimmingCharacters(in: .whitespaces)
             pending = String(pending[pending.index(after: newline)...])

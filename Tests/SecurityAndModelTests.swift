@@ -93,6 +93,33 @@ final class SecurityAndModelTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: projector))
     }
 
+    func testProjectorAttachesToTheRequestedModel() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manager = ModelManager(directoryURL: root.appendingPathComponent("Models", isDirectory: true))
+        for name in ["first", "second"] {
+            let source = root.appendingPathComponent("\(name).gguf")
+            try Data("weights \(name)".utf8).write(to: source)
+            _ = try await manager.importModel(from: source)
+        }
+        let projector = root.appendingPathComponent("mmproj-first.gguf")
+        try Data("projector".utf8).write(to: projector)
+
+        let attached = try await manager.importModel(from: projector, projectorTarget: "first")
+        XCTAssertEqual(attached.id, "first")
+        XCTAssertEqual(attached.modalities, ["text", "image"])
+        let second = await manager.model(id: "second")
+        XCTAssertNil(second?.projectorPath)
+
+        do {
+            _ = try await manager.importModel(from: projector, projectorTarget: "missing")
+            XCTFail("Expected an unknown projector target to be rejected")
+        } catch let error as ModelImportError {
+            XCTAssertEqual(error.localizedDescription, "The model this image projector belongs to is not installed.")
+        }
+    }
+
     func testProjectorWithoutGGUFModelIsRejected() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

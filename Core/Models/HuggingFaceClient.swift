@@ -8,16 +8,20 @@ struct HuggingFaceModelSummary: Decodable, Identifiable, Sendable, Equatable {
     let likes: Int
     /// Gated repositories need an access token whose account accepted the model's terms.
     let gated: Bool
+    /// The task the model is published for, such as `text-generation` or `image-text-to-text`.
+    let pipelineTag: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, downloads, likes, gated
+        case pipelineTag = "pipeline_tag"
     }
 
-    init(id: String, downloads: Int = 0, likes: Int = 0, gated: Bool = false) {
+    init(id: String, downloads: Int = 0, likes: Int = 0, gated: Bool = false, pipelineTag: String? = nil) {
         self.id = id
         self.downloads = downloads
         self.likes = likes
         self.gated = gated
+        self.pipelineTag = pipelineTag
     }
 
     init(from decoder: Decoder) throws {
@@ -25,12 +29,44 @@ struct HuggingFaceModelSummary: Decodable, Identifiable, Sendable, Equatable {
         id = try container.decode(String.self, forKey: .id)
         downloads = (try? container.decode(Int.self, forKey: .downloads)) ?? 0
         likes = (try? container.decode(Int.self, forKey: .likes)) ?? 0
+        pipelineTag = try? container.decode(String.self, forKey: .pipelineTag)
         // The API sends `false`, or the string "auto" or "manual".
         if let flag = try? container.decode(Bool.self, forKey: .gated) {
             gated = flag
         } else {
             gated = (try? container.decode(String.self, forKey: .gated)) != nil
         }
+    }
+}
+
+/// What a model is used for, as a search filter. Only uses this app can run are offered.
+enum ModelUse: String, CaseIterable, Identifiable, Sendable {
+    case any
+    case text
+    case vision
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .any: return "All"
+        case .text: return "Text"
+        case .vision: return "Image + text"
+        }
+    }
+
+    /// Hugging Face task tags that belong to this use; empty means no filter.
+    var pipelineTags: [String] {
+        switch self {
+        case .any: return []
+        case .text: return ["text-generation"]
+        case .vision: return ["image-text-to-text", "any-to-any"]
+        }
+    }
+
+    /// The use a task tag stands for, or nil when this app cannot run that kind of model.
+    static func supported(pipelineTag: String) -> ModelUse? {
+        [ModelUse.text, .vision].first { $0.pipelineTags.contains(pipelineTag) }
     }
 }
 
@@ -97,7 +133,7 @@ struct HuggingFaceClient: Sendable {
         ) != nil
     }
 
-    static func searchURL(query: String, ggufOnly: Bool, limit: Int = 40) -> URL? {
+    static func searchURL(query: String, ggufOnly: Bool, pipelineTag: String? = nil, limit: Int = 40) -> URL? {
         var components = URLComponents(string: "https://huggingface.co/api/models")
         var items = [
             URLQueryItem(name: "sort", value: "downloads"),
@@ -107,6 +143,7 @@ struct HuggingFaceClient: Sendable {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { items.append(URLQueryItem(name: "search", value: trimmed)) }
         if ggufOnly { items.append(URLQueryItem(name: "filter", value: "gguf")) }
+        if let pipelineTag { items.append(URLQueryItem(name: "pipeline_tag", value: pipelineTag)) }
         components?.queryItems = items
         return components?.url
     }
@@ -156,9 +193,27 @@ struct HuggingFaceClient: Sendable {
             }
     }
 
-    func search(query: String, ggufOnly: Bool) async throws -> [HuggingFaceModelSummary] {
-        guard let url = Self.searchURL(query: query, ggufOnly: ggufOnly) else { throw HuggingFaceError.invalidRepository }
-        return try JSONDecoder().decode([HuggingFaceModelSummary].self, from: try await data(from: url))
+    /// Most downloaded repositories first. A use with several task tags is searched once per tag.
+    func search(query: String, ggufOnly: Bool, use: ModelUse = .any) async throws -> [HuggingFaceModelSummary] {
+        let tags: [String?] = use.pipelineTags.isEmpty ? [nil] : use.pipelineTags
+        var found: [HuggingFaceModelSummary] = []
+        for tag in tags {
+            guard let url = Self.searchURL(query: query, ggufOnly: ggufOnly, pipelineTag: tag) else {
+                throw HuggingFaceError.invalidRepository
+            }
+            found += try JSONDecoder().decode([HuggingFaceModelSummary].self, from: try await data(from: url))
+        }
+        return Self.merged(found)
+    }
+
+    /// Removes repositories listed twice and sorts by downloads.
+    static func merged(_ results: [HuggingFaceModelSummary], limit: Int = 40) -> [HuggingFaceModelSummary] {
+        var seen = Set<String>()
+        return Array(
+            results.filter { seen.insert($0.id).inserted }
+                .sorted { $0.downloads > $1.downloads }
+                .prefix(limit)
+        )
     }
 
     func modelFiles(repository: String, revision: String = "main") async throws -> [HuggingFaceFile] {

@@ -218,7 +218,7 @@ bash scripts/iphone/push_model.sh ~/models/gemma-4-E2B-it.litertlm
 
 ### Hugging Face のモデルを試す
 
-アプリ単体でも、Models タブの「Browse Hugging Face」からモデルを検索し、ファイル(量子化)を選んでダウンロードできます。各ファイルにはサイズと「この iPhone に収まるか」の目安が表示されます。画像入力を使う場合は、モデルをダウンロードした後に同じリポジトリの「Image projectors」(mmproj)をダウンロードします。gated / private リポジトリ用のアクセストークンは Settings タブで保存できます(Keychain に保存され、huggingface.co にのみ送信されます)。ダウンロードはアプリを前面に表示している間だけ進みます。
+アプリ単体でも、Models タブの「Browse Hugging Face」からモデルを検索し、ファイル(量子化)を選んでダウンロードできます。検索は用途で絞り込めます(All / Text / Image + text)。各ファイルにはサイズと「この iPhone に収まるか」の目安が表示されます。画像入力にはモデル本体に加えて image projector(mmproj)が必要です。リポジトリに mmproj がある場合、Download メニューの「With image input」でモデルと一番小さい mmproj をまとめてダウンロードし、そのモデルに紐付けます。導入済みのモデルには「Add image input」で mmproj だけ追加できます。gated / private リポジトリ用のアクセストークンは Settings タブで保存できます(Keychain に保存され、huggingface.co にのみ送信されます)。ダウンロードはアプリを前面に表示している間だけ進みます。
 
 PC から同じことを行う API もあります。
 

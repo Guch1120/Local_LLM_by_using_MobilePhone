@@ -61,6 +61,29 @@ final class HuggingFaceTests: XCTestCase {
         XCTAssertEqual(URLComponents(url: all!, resolvingAgainstBaseURL: false)?.queryItems?.map(\.name), ["sort", "direction", "limit"])
     }
 
+    func testUseFilterAddsTaskTagAndMergesResultsByDownloads() {
+        let url = HuggingFaceClient.searchURL(query: "gemma", ggufOnly: true, pipelineTag: "image-text-to-text")
+        let items = URLComponents(url: url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        XCTAssertTrue(items.contains(URLQueryItem(name: "pipeline_tag", value: "image-text-to-text")))
+        XCTAssertEqual(ModelUse.any.pipelineTags, [])
+        XCTAssertEqual(ModelUse.vision.pipelineTags, ["image-text-to-text", "any-to-any"])
+        XCTAssertEqual(ModelUse.supported(pipelineTag: "any-to-any"), .vision)
+        XCTAssertEqual(ModelUse.supported(pipelineTag: "text-generation"), .text)
+        XCTAssertNil(ModelUse.supported(pipelineTag: "automatic-speech-recognition"))
+
+        let merged = HuggingFaceClient.merged([
+            HuggingFaceModelSummary(id: "a/vision", downloads: 10, pipelineTag: "image-text-to-text"),
+            HuggingFaceModelSummary(id: "b/any", downloads: 30, pipelineTag: "any-to-any"),
+            HuggingFaceModelSummary(id: "a/vision", downloads: 10, pipelineTag: "image-text-to-text"),
+            HuggingFaceModelSummary(id: "c/any", downloads: 20, pipelineTag: "any-to-any")
+        ], limit: 2)
+        XCTAssertEqual(merged.map(\.id), ["b/any", "c/any"])
+
+        let json = #"[{"id": "x/y", "pipeline_tag": "image-text-to-text"}]"#
+        let decoded = try? JSONDecoder().decode([HuggingFaceModelSummary].self, from: Data(json.utf8))
+        XCTAssertEqual(decoded?.first?.pipelineTag, "image-text-to-text")
+    }
+
     func testFitEstimateComparesFileSizeWithDeviceMemory() {
         let eightGigabytes: UInt64 = 8 * 1_073_741_824
         XCTAssertEqual(ModelFit.estimate(sizeBytes: 2_800_000_000, physicalMemory: eightGigabytes), .comfortable)

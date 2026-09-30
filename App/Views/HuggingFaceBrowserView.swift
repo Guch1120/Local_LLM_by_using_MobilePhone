@@ -5,6 +5,7 @@ struct HuggingFaceBrowserView: View {
     @EnvironmentObject private var appState: AppState
     @State private var query: String
     @State private var ggufOnly = true
+    @State private var use = ModelUse.any
     @State private var results: [HuggingFaceModelSummary] = []
     @State private var searching = false
     @State private var searchError: String?
@@ -26,8 +27,13 @@ struct HuggingFaceBrowserView: View {
                     Text("All formats").tag(false)
                 }
                 .pickerStyle(.segmented)
+                Picker("Use", selection: $use) {
+                    ForEach(ModelUse.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
                 Text(
-                    "GGUF models run on llama.cpp and can take images with an mmproj file. "
+                    "Image + text lists models that take pictures; they need an image projector (mmproj), "
+                        + "which the download menu adds. GGUF models run on llama.cpp. "
                         + "Choose All formats to find .litertlm models (for example \"litert-community\")."
                 )
                 .font(.footnote)
@@ -69,6 +75,7 @@ struct HuggingFaceBrowserView: View {
         .autocorrectionDisabled()
         .onSubmit(of: .search) { Task { await search() } }
         .onChange(of: ggufOnly) { _, _ in Task { await search() } }
+        .onChange(of: use) { _, _ in Task { await search() } }
         .task { if results.isEmpty { await search() } }
         .navigationDestination(isPresented: $showingInitialRepository) {
             HuggingFaceRepositoryView(repository: initialRepository)
@@ -89,15 +96,31 @@ struct HuggingFaceBrowserView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            useLabel(model.pipelineTag)
         }
         .padding(.vertical, 2)
+    }
+
+    /// What the model is for. Kinds this app cannot run (speech, image generation, ...) are marked.
+    @ViewBuilder
+    private func useLabel(_ pipelineTag: String?) -> some View {
+        if let pipelineTag {
+            switch ModelUse.supported(pipelineTag: pipelineTag) {
+            case .vision?:
+                Label("Image + text", systemImage: "photo").font(.caption).foregroundStyle(.blue)
+            case .text?:
+                Label("Text", systemImage: "text.alignleft").font(.caption).foregroundStyle(.secondary)
+            default:
+                Label("Not supported: \(pipelineTag)", systemImage: "nosign").font(.caption).foregroundStyle(.orange)
+            }
+        }
     }
 
     private func search() async {
         searching = true
         defer { searching = false }
         do {
-            results = try await appState.huggingFaceClient.search(query: query, ggufOnly: ggufOnly)
+            results = try await appState.huggingFaceClient.search(query: query, ggufOnly: ggufOnly, use: use)
             searchError = nil
         } catch is CancellationError {
             return
@@ -161,8 +184,8 @@ struct HuggingFaceRepositoryView: View {
                     Text("Image projectors")
                 } footer: {
                     Text(
-                        "Download the model first. A projector attaches to the most recently installed "
-                            + "GGUF model and enables image input."
+                        "Image input needs the model and a projector. The model's download menu adds one; "
+                            + "a projector downloaded here attaches to the most recently installed GGUF model."
                     )
                 }
             }
@@ -212,15 +235,61 @@ struct HuggingFaceRepositoryView: View {
             Text(progressText(download))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
+        } else if let installed = installedModel(file), let projector = smallestProjector {
+            if installed.projectorPath == nil {
+                Menu {
+                    Button {
+                        appState.startProjectorDownload(repository: repository, projector: projector, modelID: installed.id)
+                    } label: {
+                        Label("Add image input (\(Self.size(projector)))", systemImage: "photo")
+                    }
+                } label: {
+                    Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                }
+            } else {
+                installedMark
+            }
         } else if download?.state == .completed || isInstalled(file) {
-            Label("Installed", systemImage: "checkmark.circle.fill")
-                .labelStyle(.iconOnly)
-                .foregroundStyle(.green)
-                .accessibilityLabel("Installed")
+            installedMark
+        } else if !file.isProjector, file.fileName.lowercased().hasSuffix(".gguf"), let projector = smallestProjector {
+            Menu("Download") {
+                Button {
+                    appState.startDownload(repository: repository, file: file, projector: projector)
+                } label: {
+                    Label("With image input (+\(Self.size(projector)))", systemImage: "photo")
+                }
+                Button {
+                    appState.startDownload(repository: repository, file: file)
+                } label: {
+                    Label("Model only (text)", systemImage: "text.alignleft")
+                }
+            }
+            .buttonStyle(.bordered)
         } else {
             Button("Download") { appState.startDownload(repository: repository, file: file) }
                 .buttonStyle(.bordered)
         }
+    }
+
+    private var installedMark: some View {
+        Label("Installed", systemImage: "checkmark.circle.fill")
+            .labelStyle(.iconOnly)
+            .foregroundStyle(.green)
+            .accessibilityLabel("Installed")
+    }
+
+    /// The projector offered with a model: the smallest one keeps memory free for the model.
+    private var smallestProjector: HuggingFaceFile? {
+        files.filter(\.isProjector).min { $0.sizeBytes < $1.sizeBytes }
+    }
+
+    private func installedModel(_ file: HuggingFaceFile) -> InstalledModel? {
+        guard !file.isProjector, file.fileName.lowercased().hasSuffix(".gguf") else { return nil }
+        return appState.installedModels.first { $0.name == file.baseName }
+    }
+
+    private static func size(_ file: HuggingFaceFile) -> String {
+        ByteCountFormatter.string(fromByteCount: file.sizeBytes, countStyle: .file)
     }
 
     private func progressText(_ download: ModelDownload) -> String {

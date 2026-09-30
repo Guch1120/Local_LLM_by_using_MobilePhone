@@ -21,6 +21,8 @@ actor InferenceService {
         guard !generationInProgress else { throw InferenceError.requestInProgress }
         loaded = false
         await metrics.setModel(loaded: false, model: nil, backend: backend.identifier, loadMilliseconds: nil)
+        // Each step is logged so that a load that never returns shows where it stopped.
+        await logs.write(.info, event: "model_unloading_previous", details: "backend=\(backend.identifier)")
         await backend.unloadModel()
         let configuration = ModelConfiguration(
             id: model.id,
@@ -33,6 +35,7 @@ actor InferenceService {
         )
         let candidate: any InferenceBackend = model.backend == "llama.cpp" ? LlamaCppBackend() : LiteRTGemmaBackend()
         let start = Date()
+        await logs.write(.info, event: "model_backend_loading", details: "backend=\(candidate.identifier) model=\(model.id)")
         try await candidate.loadModel(configuration: configuration)
         backend = candidate
         modelID = model.id

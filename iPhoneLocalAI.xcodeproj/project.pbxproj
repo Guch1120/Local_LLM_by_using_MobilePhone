@@ -33,6 +33,7 @@
 		200000000000000000000020 /* ModelDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000001F /* ModelDownloader.swift */; };
 		200000000000000000000021 /* HuggingFaceBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000020 /* HuggingFaceBrowserView.swift */; };
 		200000000000000000000022 /* HuggingFaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000021 /* HuggingFaceTests.swift */; };
+		200000000000000000000023 /* StandardOutputGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000022 /* StandardOutputGuard.swift */; };
 		20000000000000000000001D /* LlamaFramework in Frameworks */ = {isa = PBXBuildFile; productRef = 800000000000000000000004 /* LlamaFramework */; };
 		200000000000000000000018 /* LiteRTLM in Frameworks */ = {isa = PBXBuildFile; productRef = 800000000000000000000002 /* LiteRTLM */; };
 		20000000000000000000001A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000019 /* Assets.xcassets */; };
@@ -62,6 +63,7 @@
 		10000000000000000000001F /* ModelDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloader.swift; sourceTree = "<group>"; };
 		100000000000000000000020 /* HuggingFaceBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceBrowserView.swift; sourceTree = "<group>"; };
 		100000000000000000000021 /* HuggingFaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceTests.swift; sourceTree = "<group>"; };
+		100000000000000000000022 /* StandardOutputGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StandardOutputGuard.swift; sourceTree = "<group>"; };
 		100000000000000000000013 /* MockInferenceBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockInferenceBackend.swift; sourceTree = "<group>"; };
 		100000000000000000000014 /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
 		100000000000000000000015 /* OpenAIRequestAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIRequestAdapter.swift; sourceTree = "<group>"; };
@@ -77,7 +79,7 @@
 		300000000000000000000006 /* Inference */ = {isa = PBXGroup; children = (10000000000000000000000A, 10000000000000000000000B, 10000000000000000000000C); path = Inference; sourceTree = "<group>"; };
 		300000000000000000000007 /* Models */ = {isa = PBXGroup; children = (10000000000000000000000D, 10000000000000000000001E, 10000000000000000000001F); path = Models; sourceTree = "<group>"; };
 		300000000000000000000008 /* Metrics */ = {isa = PBXGroup; children = (10000000000000000000000E); path = Metrics; sourceTree = "<group>"; };
-		300000000000000000000009 /* Logging */ = {isa = PBXGroup; children = (10000000000000000000000F); path = Logging; sourceTree = "<group>"; };
+		300000000000000000000009 /* Logging */ = {isa = PBXGroup; children = (10000000000000000000000F, 100000000000000000000022); path = Logging; sourceTree = "<group>"; };
 		30000000000000000000000A /* Security */ = {isa = PBXGroup; children = (100000000000000000000010, 100000000000000000000011); path = Security; sourceTree = "<group>"; };
 		300000000000000000000005 /* Core */ = {isa = PBXGroup; children = (300000000000000000000006, 300000000000000000000007, 300000000000000000000008, 300000000000000000000009, 30000000000000000000000A); name = Core; path = Core; sourceTree = "<group>"; };
 		30000000000000000000000C /* LiteRT */ = {isa = PBXGroup; children = (100000000000000000000012); path = LiteRT; sourceTree = "<group>"; };
@@ -115,6 +117,7 @@
 				20000000000000000000001F,
 				200000000000000000000020,
 				200000000000000000000021,
+				200000000000000000000023,
 			); runOnlyForDeploymentPostprocessing = 0; };
 		400000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (200000000000000000000018 /* LiteRTLM in Frameworks */, 20000000000000000000001D /* LlamaFramework in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
 		400000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (20000000000000000000001A /* Assets.xcassets in Resources */, 20000000000000000000001B /* PrivacyInfo.xcprivacy in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
