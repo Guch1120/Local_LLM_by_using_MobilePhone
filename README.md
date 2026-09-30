@@ -196,6 +196,16 @@ IPA は `artifacts/iphone/builds/<run id>/` に保存されます。開発署名
 
 公開リポジトリの Actions 成果物は誰でもダウンロードできるため、IPA は repository secret `DEV_IPA_PASSWORD` で暗号化してアップロードされます。インストールする PC には同じパスワードを `~/.config/iphone-local-ai/dev-ipa-password`(パーミッション 600)に置くか、環境変数 `DEV_IPA_PASSWORD` で渡してください。
 
+このパスワードは成果物を暗号化するためだけのもので、アプリの署名とは関係ありません。署名(Apple のクラウド管理証明書、チーム、登録端末)はパスワードを変えても変わらず、どの PC からインストールしても同じアプリです。
+
+GitHub の secret は設定後に読み出せないため、パスワードはリポジトリには書かず、開発に使う各 PC のファイルに同じ値を置きます。**2026-09-30 にパスワードを更新しました。** それ以降のビルドをインストールする PC には、更新後の値が必要です(更新した PC の `~/.config/iphone-local-ai/dev-ipa-password` を安全な経路でコピーしてください)。値が分からなくなった場合は、次のように新しい値へ更新すれば、以降のビルドからその値で復号できます(更新前のビルドは古い値でしか復号できません)。
+
+```bash
+mkdir -p ~/.config/iphone-local-ai && chmod 700 ~/.config/iphone-local-ai
+( umask 077; printf '%s' "$(openssl rand -base64 36 | tr -d '\n=+/')" > ~/.config/iphone-local-ai/dev-ipa-password )
+gh secret set DEV_IPA_PASSWORD < ~/.config/iphone-local-ai/dev-ipa-password
+```
+
 ### モデルを USB で転送する
 
 モデル(`.litertlm` / `.gguf`)はアプリに同梱せず、USB でアプリの Documents フォルダへ転送します。アプリは起動時(またはモデル画面の「Import from Documents folder」)に Documents 内のモデルを Application Support へ移動し、SHA-256 を記録して登録します。

@@ -44,6 +44,7 @@ Use these helpers for device checks from Ubuntu:
 - Hugging Face models: `bash scripts/iphone/hf_model.sh REPO` lists the model files of a repository; with file names it downloads them to `~/models/` and pushes them to the phone. `bash scripts/iphone/try_model.sh MODEL_ID ["PROMPT"] [IMAGE]` sends a test request and prints the reply and speed.
 - Model transfer: `bash scripts/iphone/push_model.sh PATH/TO/model.litertlm` (or `model.gguf mmproj.gguf`) uploads into the app's Documents folder; the app moves it into Application Support on launch. Keep model files outside the repository.
 - Install app changes: push to `iphone`, then `bash scripts/iphone/install_dev_build.sh --wait` installs the development-signed IPA from the `iOS dev build` workflow over USB. Use the manual TestFlight workflow only for distribution builds.
+- `DEV_IPA_PASSWORD` only encrypts the IPA artifact; it has nothing to do with code signing. GitHub secrets cannot be read back, so every development PC keeps the same value in `~/.config/iphone-local-ai/dev-ipa-password`. It was rotated on 2026-09-30; README.md explains how to rotate it again. Never commit or print the value.
 - The helpers need only `pymobiledevice3` (user-level pip install); `iproxy`, `idevice_id`, and `idevicesyslog` are used when installed. `install_dev_build.sh` also needs an authenticated `gh` and the `DEV_IPA_PASSWORD` value.
 
 ## Dependency policy
