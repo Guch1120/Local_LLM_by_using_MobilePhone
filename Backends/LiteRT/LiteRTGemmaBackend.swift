@@ -131,7 +131,13 @@ actor LiteRTGemmaBackend: InferenceBackend {
     }
 
     func metrics() async -> BackendMetrics {
-        BackendMetrics(loadedModel: loadedModel, modelLoadMilliseconds: modelLoadMilliseconds, computeBackend: selectedBackend, multiTokenPredictionEnabled: multiTokenPredictionEnabled, contextTokens: contextTokens)
+        BackendMetrics(
+            loadedModel: loadedModel,
+            modelLoadMilliseconds: modelLoadMilliseconds,
+            computeBackend: selectedBackend,
+            multiTokenPredictionEnabled: multiTokenPredictionEnabled,
+            contextTokens: contextTokens
+        )
     }
 
     private static func convertMessage(_ message: InferenceMessage) -> Message {
