@@ -215,8 +215,7 @@ final class LlamaRuntime: @unchecked Sendable {
                     multimodal,
                     raw.bindMemory(to: UInt8.self).baseAddress,
                     raw.count,
-                    false,
-                    mtmd_helper_init_opt_default()
+                    false
                 )
             }
             if let video = wrapper.video_ctx { mtmd_helper_video_free(video) }
@@ -228,7 +227,7 @@ final class LlamaRuntime: @unchecked Sendable {
         defer { mtmd_input_chunks_free(chunks) }
         let status: Int32 = prompt.withCString { cString in
             var text = mtmd_input_text(text: cString, text_len: strlen(cString), add_special: true, parse_special: true)
-            return bitmaps.withUnsafeBufferPointer { buffer in
+            return bitmaps.withUnsafeMutableBufferPointer { buffer in
                 mtmd_tokenize(multimodal, chunks, &text, buffer.baseAddress, buffer.count)
             }
         }

@@ -1,5 +1,7 @@
 // swift-tools-version: 5.9
 // Pins llama.cpp's official Apple XCFramework, which includes libmtmd for image input.
+// b10456 is the last release whose XCFramework still ships the iOS Simulator slice
+// (later releases build only macOS and iOS device), which the unit tests need.
 // To update: change the build tag and checksum (`swift package compute-checksum <zip>`).
 
 import PackageDescription
@@ -13,8 +15,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "LlamaFramework",
-            url: "https://github.com/ggml-org/llama.cpp/releases/download/b11270/llama-b11270-xcframework.zip",
-            checksum: "573011fb1296f1c0579c3130392f42289707c35be58a2e8aa84aa4c19e7657dd"
+            url: "https://github.com/ggml-org/llama.cpp/releases/download/b10456/llama-b10456-xcframework.zip",
+            checksum: "0223bedd0a01232399d943dcb72bc227882bc90df98e29d7a92343531a88cc02"
         )
     ]
 )
