@@ -94,9 +94,13 @@ struct ModelManagerView: View {
             .navigationTitle("モデル管理")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    // A Label is drawn as an icon only in the navigation bar, so the words are spelled out.
                     Button { showingBrowser = true } label: {
-                        Label("HFでモデルを探す", systemImage: "magnifyingglass")
-                            .labelStyle(.titleAndIcon)
+                        HStack(spacing: 4) {
+                            Image(systemName: "magnifyingglass")
+                            Text("HFでモデルを探す")
+                        }
+                        .font(.subheadline.weight(.semibold))
                     }
                     .accessibilityLabel("Hugging Face でモデルを探す")
                 }
@@ -136,11 +140,14 @@ struct ModelManagerView: View {
                 .textSelection(.enabled)
             HStack {
                 Label("テキスト", systemImage: "text.alignleft")
+                    .fixedSize()
                 if model.modalities.contains("image") {
                     Label("画像", systemImage: "photo")
+                        .fixedSize()
                 }
                 Text(model.backend)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 Spacer()
                 if appState.metricsSnapshot?.model == model.id {
                     Button("アンロード") { Task { await appState.unloadModel() } }
