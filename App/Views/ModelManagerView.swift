@@ -120,6 +120,15 @@ struct ModelManagerView: View {
         }
     }
 
+    private func capability(_ title: String, symbol: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol)
+            Text(title)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+
     @ViewBuilder
     private func modelRow(_ model: InstalledModel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -139,11 +148,11 @@ struct ModelManagerView: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             HStack {
-                Label("テキスト", systemImage: "text.alignleft")
-                    .fixedSize()
+                // Spelled out as icon + text: a Label next to the wide button wrapped ("テキ/スト"),
+                // and with fixedSize() it lost its words in the list row.
+                capability("テキスト", symbol: "text.alignleft")
                 if model.modalities.contains("image") {
-                    Label("画像", systemImage: "photo")
-                        .fixedSize()
+                    capability("画像", symbol: "photo")
                 }
                 Text(model.backend)
                     .foregroundStyle(.secondary)
