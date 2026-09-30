@@ -401,14 +401,24 @@ extension AppState {
             lastError = "The selected model is no longer installed."
             return
         }
+        var stage = "verify"
         do {
             guard try await modelManager.verifyModel(id: id) else {
                 throw InferenceError.backendUnavailable("The model file is missing or its SHA-256 no longer matches the registry.")
             }
+            stage = "load"
             try await inference.loadImportedModel(model, contextTokens: contextTokens, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
             UserDefaults.standard.set(id, forKey: Self.lastLoadedModelKey)
             lastError = nil
         } catch {
+            let nsError = error as NSError
+            let underlying = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError)
+                .map { " underlying=\($0.domain)#\($0.code)" } ?? ""
+            await logs.write(
+                .error,
+                event: "model_load_failed",
+                details: "model=\(id) stage=\(stage) error=\(nsError.domain)#\(nsError.code)\(underlying)"
+            )
             lastError = error.localizedDescription
         }
         await refresh()

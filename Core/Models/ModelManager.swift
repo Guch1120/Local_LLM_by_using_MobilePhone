@@ -242,9 +242,13 @@ actor ModelManager {
         let handle = try FileHandle(forReadingFrom: fileURL)
         defer { try? handle.close() }
         var hasher = SHA256()
-        while let block = try handle.read(upToCount: 1024 * 1024), !block.isEmpty {
+        // Drain each block's autoreleased buffer; otherwise hashing a multi-gigabyte model
+        // accumulates the whole file in memory and reads start failing under pressure.
+        while try autoreleasepool(invoking: { () throws -> Bool in
+            guard let block = try handle.read(upToCount: 1024 * 1024), !block.isEmpty else { return false }
             hasher.update(data: block)
-        }
+            return true
+        }) {}
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 }
