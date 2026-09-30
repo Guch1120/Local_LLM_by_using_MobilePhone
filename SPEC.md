@@ -25,6 +25,17 @@ Camera capture, microphone/audio, speech recognition, TTS, embeddings, RAG, ROS,
 
 The SwiftUI app, foreground HTTP server, authenticated OpenAI API, MockBackend, `.litertlm` model import/verification, generation defaults, diagnostics, benchmark actions, and unit/integration tests are implemented. LiteRT-LM 0.17.1 is connected behind the backend protocol with Metal-first initialization and CPU fallback. The app and tests are developed primarily from Ubuntu and validated with the macOS GitHub Actions workflows because the local development environment has no Xcode toolchain. Verified on an iPhone 16 (iOS 26.4.2) on 2026-09-30: TestFlight upload and install, development-signed IPA install over USB, USB model transfer and SHA-256 registration, Gemma 4 E2B (`gemma-4-E2B-it.litertlm`) text inference on the Metal GPU backend (non-streaming, streaming, multi-turn, Japanese), automatic reload after restart, and access from Ubuntu with the OpenAI Python SDK through `iproxy`. Image input does not work with LiteRT-LM 0.17.1 on iOS: the GPU vision encoder fails (`STABLEHLO_COMPOSITE failed to prepare`) and the CPU vision encoder hung the request, matching upstream issues #2979 and #2370, so LiteRT-LM models report `image: false` and reject image requests with `unsupported_modality`. Image input runs on the llama.cpp backend instead. Verified on the same iPhone 16 with build 12: text and image requests to Gemma 4 E2B (`gemma-4-E2B-it-Q4_0.gguf` with `mmproj-gemma-4-E2B-it-Q8_0.gguf`) on Metal; twenty consecutive switches between two LiteRT-LM models and two GGUF models without a failed load (before the Extended Virtual Addressing entitlement the first switch from LiteRT-LM to GGUF failed); a non-Gemma model (Qwen2.5 0.5B) answering through its own chat template; a model downloaded from Hugging Face by the phone itself through `POST /models/downloads`, registered and used; and the model browser's search and repository screens.
 
+Measured on the iPhone 16 with build 14, Gemma 4 E2B Q4_0 with the Q8_0 projector on llama.cpp/Metal, 128 output tokens, streaming over USB (thermal state nominal, about 800 MB app memory):
+
+| Input | Time to first token | Generation |
+| --- | --- | --- |
+| Text only | 0.1–0.2 s | 29–30 tokens/s |
+| Image 320×240 | 0.7 s | 31 tokens/s |
+| Image 640×480 | 1.4 s | 30 tokens/s |
+| Image 1920×1440 | 2.7 s | 30 tokens/s |
+
+An image adds to the time before the first token (encoding the picture and evaluating its tokens); generation speed stays the same. The first request after a model switch also waits for the load, about 3 s for this model.
+
 ## API behavior
 
 - All API routes except `/health` require `Authorization: Bearer <key>`.
