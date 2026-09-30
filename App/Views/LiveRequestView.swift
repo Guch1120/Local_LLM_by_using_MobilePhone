@@ -7,6 +7,8 @@ struct LiveRequest: Identifiable {
     enum State {
         case generating
         case completed
+        /// The output was cut off by the token limit.
+        case truncated
         case failed
     }
 
@@ -17,6 +19,7 @@ struct LiveRequest: Identifiable {
     /// Messages before the last user message (system prompt and earlier turns).
     let earlierMessages: Int
     let images: [UIImage]
+    let maxTokens: Int
     let startedAt = Date()
     private(set) var output = ""
     private(set) var state = State.generating
@@ -27,6 +30,7 @@ struct LiveRequest: Identifiable {
     init(_ request: InferenceRequest) {
         id = request.id
         model = request.model
+        maxTokens = request.maxTokens
         let lastUserIndex = request.messages.lastIndex { $0.role == .user }
         let parts = lastUserIndex.map { request.messages[$0].parts } ?? []
         prompt = parts.compactMap { part -> String? in
@@ -50,8 +54,8 @@ struct LiveRequest: Identifiable {
         lastPieceAt = Date()
     }
 
-    mutating func finish(failed: Bool) {
-        state = failed ? .failed : .completed
+    mutating func finish(failed: Bool, truncated: Bool) {
+        state = failed ? .failed : (truncated ? .truncated : .completed)
     }
 
     /// Generated pieces per second; a piece is roughly one token.
@@ -75,7 +79,7 @@ struct LiveRequestView: View {
                 if request.state == .generating { ProgressView() }
                 Text(statusText)
                     .font(.caption)
-                    .foregroundStyle(request.state == .failed ? Color.orange : Color.secondary)
+                    .foregroundStyle(request.state == .failed || request.state == .truncated ? Color.orange : Color.secondary)
                 Spacer()
                 Text(request.model)
                     .font(.caption.monospaced())
@@ -137,6 +141,7 @@ struct LiveRequestView: View {
         switch request.state {
         case .generating: parts = ["生成中"]
         case .completed: parts = ["完了"]
+        case .truncated: parts = ["出力上限（\(request.maxTokens) トークン）で停止"]
         case .failed: parts = ["失敗"]
         }
         if let seconds = request.secondsToFirstPiece {

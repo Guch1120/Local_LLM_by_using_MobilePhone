@@ -47,11 +47,11 @@ actor LlamaCppBackend: InferenceBackend {
         return AsyncThrowingStream { continuation in
             let task = Task.detached(priority: .userInitiated) {
                 do {
-                    try runtime.generate(request: request) { text in
+                    let reachedLimit = try runtime.generate(request: request) { text in
                         continuation.yield(InferenceChunk(text: text))
                         return !Task.isCancelled
                     }
-                    continuation.yield(InferenceChunk(text: "", finishReason: "stop"))
+                    continuation.yield(InferenceChunk(text: "", finishReason: reachedLimit ? "length" : "stop"))
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -244,7 +244,8 @@ final class LlamaRuntime: @unchecked Sendable {
     }
 
     /// Runs one completion. `emit` receives decoded text and returns false to stop early.
-    func generate(request: InferenceRequest, emit: (String) -> Bool) throws {
+    /// Returns true when the output was cut off by the token limit instead of ending by itself.
+    func generate(request: InferenceRequest, emit: (String) -> Bool) throws -> Bool {
         llama_memory_clear(llama_get_memory(context), true)
         let (prompt, images) = formatPrompt(request.messages)
 
@@ -259,15 +260,20 @@ final class LlamaRuntime: @unchecked Sendable {
         defer { llama_sampler_free(sampler) }
         var decoder = UTF8StreamDecoder()
         let budget = min(request.maxTokens, contextSize - Int(nPast))
+        var reachedLimit = true
         for _ in 0..<max(0, budget) {
             let token = llama_sampler_sample(sampler, context, -1)
-            if llama_vocab_is_eog(vocab, token) { break }
-            if let text = decoder.append(piece(for: token)), !text.isEmpty, !emit(text) { return }
+            if llama_vocab_is_eog(vocab, token) {
+                reachedLimit = false
+                break
+            }
+            if let text = decoder.append(piece(for: token)), !text.isEmpty, !emit(text) { return false }
             var next = token
             let status = llama_decode(context, llama_batch_get_one(&next, 1))
             if status != 0 { throw LlamaError.decodeFailed(status) }
         }
         if let rest = decoder.flush(), !rest.isEmpty { _ = emit(rest) }
+        return reachedLimit
     }
 
     private var mediaMarker: String {

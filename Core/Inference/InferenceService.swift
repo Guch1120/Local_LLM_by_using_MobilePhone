@@ -5,7 +5,8 @@ import Foundation
 enum InferenceActivity: Sendable {
     case started(InferenceRequest)
     case text(requestID: String, String)
-    case finished(requestID: String, failed: Bool)
+    /// `truncated`: the output was cut off by the token limit.
+    case finished(requestID: String, failed: Bool, truncated: Bool)
 }
 
 actor InferenceService {
@@ -123,6 +124,7 @@ actor InferenceService {
                 var firstTokenAt: Date?
                 var generatedTokens = 0
                 var failed = false
+                var truncated = false
                 do {
                     for try await chunk in stream {
                         if !chunk.text.isEmpty {
@@ -130,6 +132,7 @@ actor InferenceService {
                             generatedTokens += chunk.text.split(whereSeparator: \.isWhitespace).count
                             observer?(.text(requestID: request.id, chunk.text))
                         }
+                        if chunk.finishReason == "length" { truncated = true }
                         continuation.yield(chunk)
                     }
                     continuation.finish()
@@ -146,7 +149,8 @@ actor InferenceService {
                     generatedTokens: generatedTokens,
                     ttftMilliseconds: ttft,
                     totalLatencyMilliseconds: latency,
-                    failed: failed
+                    failed: failed,
+                    truncated: truncated
                 )
             }
             continuation.onTermination = { _ in task.cancel() }
@@ -169,10 +173,11 @@ actor InferenceService {
         generatedTokens: Int,
         ttftMilliseconds: Double,
         totalLatencyMilliseconds: Double,
-        failed: Bool
+        failed: Bool,
+        truncated: Bool = false
     ) async {
         generationInProgress = false
-        observer?(.finished(requestID: requestID, failed: failed))
+        observer?(.finished(requestID: requestID, failed: failed, truncated: truncated))
         await metrics.finishRequest(
             promptTokens: promptTokens,
             generatedTokens: generatedTokens,

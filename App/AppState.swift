@@ -505,9 +505,9 @@ extension AppState {
         case let .text(requestID, text):
             guard liveRequest?.id == requestID else { return }
             liveRequest?.append(text)
-        case let .finished(requestID, failed):
+        case let .finished(requestID, failed, truncated):
             guard liveRequest?.id == requestID else { return }
-            liveRequest?.finish(failed: failed)
+            liveRequest?.finish(failed: failed, truncated: truncated)
         }
     }
 }

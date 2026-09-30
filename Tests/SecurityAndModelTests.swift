@@ -198,8 +198,8 @@ final class SecurityAndModelTests: XCTestCase {
                 events.append("started \(started.id)")
             case let .text(_, text):
                 reported += text
-            case let .finished(requestID, failed):
-                events.append("finished \(requestID) failed=\(failed)")
+            case let .finished(requestID, failed, truncated):
+                events.append("finished \(requestID) failed=\(failed || truncated)")
                 break loop
             }
         }
