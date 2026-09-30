@@ -57,6 +57,9 @@ actor LlamaCppBackend: InferenceBackend {
                         usage: TokenUsage(promptTokens: result.promptTokens, completionTokens: result.completionTokens)
                     ))
                     continuation.finish()
+                } catch let LlamaError.promptTooLong(tokens, limit) {
+                    // A client can react to this (shorten the history), so it gets its own error type.
+                    continuation.finish(throwing: InferenceError.contextLengthExceeded(promptTokens: tokens, contextTokens: limit))
                 } catch {
                     continuation.finish(throwing: error)
                 }

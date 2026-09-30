@@ -36,6 +36,28 @@ Measured on the iPhone 16 with build 14, Gemma 4 E2B Q4_0 with the Q8_0 projecto
 
 An image adds to the time before the first token (encoding the picture and evaluating its tokens); generation speed stays the same. The first request after a model switch also waits for the load, about 3 s for this model.
 
+### Context window and conversation length
+
+Measured on the iPhone 16 on 2026-10-01 (builds 24 and 25) with Gemma 4 E2B Q4_0 and the Q8_0 projector on llama.cpp/Metal, through `scripts/iphone/measure_turns.py`. Token counts are the tokenizer's own, taken from `usage`.
+
+- **Model limit and KV cache.** The model supports 131,072 tokens (`gemma4.context_length`). The app starts it with the context size from Settings; the choices 1024, 2048, 4096 and 8192 were fixed in the first commit without a recorded reason and are not a model or memory limit. The KV cache costs 18 KiB per token (the 3 full-attention layers take 6 KiB per token together and the 12 sliding-window layers 12 KiB, because llama.cpp keeps the window cache full-size): 72 MiB at 4096 and 144 MiB at 8192, read from the llama.cpp load log; the compute buffer (518 MiB) does not grow with the context. The app's memory was about 810 MB at 4096 and 823 MB at 8192. llama.cpp rounds the size up to a multiple of 256; there is no power-of-two requirement, and the output token limit is only a stop condition.
+- **Image cost.** With llama.cpp's defaults for Gemma 4 (40 to 280 image tokens) one image costs 52 tokens at 320×240 and below, 134 at 640×480 and 270 from 1280×960 up (markers included). Upscaling a small picture did not help: the same picture at 1280×960 was described worse than at 640×480.
+- **Turns that fit in 4096 tokens.**
+
+| Conversation | Growth per turn | Turns until the context was full |
+| --- | --- | --- |
+| Text only, short replies (about 45 tokens) | 75 tokens | 54 |
+| Text only, replies of 150 tokens | about 155 tokens | about 27 (from a 21-turn run, extrapolated) |
+| A 640×480 image in every turn, short replies | 205 tokens | 20 |
+
+The turn counts scale with the context: twice the turns at 8192. They depend on the reply length and, with images, on the image size (270 tokens per image from 1280×960 up).
+
+- **Latency grows with the conversation.** Every request evaluates the whole history again, including every image, because the server keeps no cache between requests: a turn took 1.6 s at the start and 29 s at 3900 tokens (text only), and 2.7 s and 40 s with an image in each of 20 turns. Prompt evaluation runs at about 200 tokens per second; decoding slows from 31 to about 21 tokens per second as the context fills and the phone warms up. Reusing the cache of the common prefix would make a turn cost only its new tokens.
+- **Memory of earlier turns.** In a 54-turn text conversation, 26 of 26 questions about what was said in earlier turns were answered correctly up to the full 4096 tokens. Three facts planted at the start, middle and end of a 3264-token conversation (context 4096) and of a 6971-token one (context 8192) were all repeated correctly (35 s to read the 6971 tokens).
+- **Heat.** The thermal level reached "serious" within one to two minutes of continuous use while the battery rose only from 36 to 37 C, and the decode speed at "serious" was 28 to 29 tokens per second against 30 when cool. By the end of a long run the battery was at 39 to 40 C. iOS gives apps no temperature in degrees; `scripts/iphone/temperature.sh` reads the battery temperature over USB, which is a weak proxy for the chip.
+
+**Quality of the answers (Gemma 4 E2B Q4_0, temperature 0).** A robot-planning conversation of 8 turns was coherent and followed the limits asked for (three steps, two points, one word). Asked for an exhaustive list of the objects in `test.png` (10 items on a table), the model found about half and invented items: with free wording it missed the red bowl and the orange cup and called the spoons knives; when the question named the categories it found all ten but also reported two knives that are not there. Counts and "how many red objects" questions were wrong. Plan on prompts that name the categories, structured output and a check of the result, or a larger model.
+
 ## API behavior
 
 - All API routes except `/health` require `Authorization: Bearer <key>`.
@@ -48,6 +70,9 @@ An image adds to the time before the first token (encoding the picture and evalu
 - stdout and stderr never block the app: when it was started from a PC and nothing reads its output any more, the output is dropped. llama.cpp debug messages, which contain the prompt text, are not written to stderr.
 - LiteRT-LM models are text-only by default; use a GGUF model with an mmproj file for images. With LiteRT-LM 0.17.1 the GPU vision encoder always fails on iOS, and each failed attempt leaves address space behind that later model loads need, while the CPU vision encoder can hang indefinitely (LiteRT-LM issues #2979, #2370). At load time the backend tries GPU text, then CPU text. Launch with `LITERT_VISION_BACKEND=gpu` (GPU vision first) or `cpu` to experiment; `/capabilities` reports whether images are enabled.
 - The app is signed with the Extended Virtual Addressing and Increased Memory Limit entitlements (`App/iPhoneLocalAI.entitlements`). Without the larger address space, memory-mapping a multi-gigabyte model fails (`mmap failed: Cannot allocate memory`) once another model has been loaded and unloaded in the same process.
+- `usage` in a chat response and `/metrics` carry exact token counts for llama.cpp models (`token_counts_estimated: false`); LiteRT-LM models and the mock backend still get a word-count estimate. With `stream_options: {"include_usage": true}` a streaming response ends with a chunk that has empty `choices` and the `usage`.
+- `/capabilities` and `/metrics` report `context_tokens`, the window the loaded model was started with (null when nothing is loaded); a request whose prompt does not fit is rejected at once with HTTP 400, type `context_length_exceeded`, and a message that states both numbers (prompt tokens and context), so a client can shorten the history and send it again. Changing the context size in Settings reloads the loaded model, for llama.cpp as well.
+- Thermal pause: requests get 503 (`thermal_limit`) while the thermal state is `critical`. The Settings choice "発熱時の動作" makes the app pause from `serious` on instead (default: `critical` only, because `serious` only lowers the speed).
 - Model context length and Multi-Token Prediction are configurable; MTP is reported from the active LiteRT backend.
 - `GET /models` lists the installed models (`id`, `name`, `backend`, `size_bytes`, `modalities`, `loaded`) and the Hugging Face downloads (`id`, `repository`, `file`, `state`, `received_bytes`, `total_bytes`, `error`, `model`). `POST /models/downloads` with `{"repository": "owner/name", "file": "model.gguf"}` (optional `revision`) queues a download and answers `202` with the download; an unknown repository or file, a file that is not a model, or too little free storage answers `400` with `download_failed`. States are `queued`, `downloading`, `importing`, `completed`, `failed`; downloads run one at a time, only while the app is in the foreground, and a failed download can be retried in the app.
 - The app contacts `huggingface.co` only to search and download models when the user (or an API client) asks for it. An optional access token for gated repositories is stored in Keychain and sent only to Hugging Face. Inference data never leaves the device.

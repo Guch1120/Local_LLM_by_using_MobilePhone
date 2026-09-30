@@ -83,6 +83,7 @@ enum InferenceError: Error, LocalizedError, Sendable {
     case requestInProgress
     case outOfMemory
     case thermalLimit(String)
+    case contextLengthExceeded(promptTokens: Int, contextTokens: Int)
     case generationCancelled
 
     var errorDescription: String? {
@@ -101,6 +102,9 @@ enum InferenceError: Error, LocalizedError, Sendable {
             return "The device does not have enough memory to complete this request."
         case let .thermalLimit(state):
             return "Inference is paused because the device thermal state is \(state)."
+        case let .contextLengthExceeded(promptTokens, contextTokens):
+            return "The prompt needs \(promptTokens) tokens, but the context holds \(contextTokens). "
+                + "Shorten it or raise the context length."
         case .generationCancelled:
             return "Generation was cancelled."
         }

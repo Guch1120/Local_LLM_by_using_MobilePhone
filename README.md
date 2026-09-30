@@ -102,6 +102,8 @@ scripts/iphone/
   push_model.sh   # .litertlm / .gguf モデルをUSBでアプリへ転送して取り込む
   hf_model.sh     # Hugging Face からモデルをダウンロードして転送
   try_model.sh    # モデルにテストリクエストを送り、応答と速度を表示
+  temperature.sh  # USB経由でバッテリー温度(℃)とアプリの発熱レベルを表示
+  measure_turns.py # 会話が何ターン続くか、遅くなり方、想起の正解率を測る
 ```
 
 初回セットアップ手順は [IPHONE_USB_SETUP.md](IPHONE_USB_SETUP.md) を参照してください。Developer Mode の有効化と DeveloperDiskImage のマウントまで完了していれば、通常は次のコマンドで接続状態を確認できます。
@@ -216,6 +218,21 @@ bash scripts/iphone/push_model.sh ~/models/gemma-4-E2B-it.litertlm
 ```
 
 転送中は `.part` という名前で送り、完了後に名前を変えるので、転送途中のファイルが取り込まれることはありません。登録後、モデル画面で「ロード」を押すと読み込まれます。iOS 向けには Hugging Face `litert-community` の汎用版(`gemma-4-E2B-it.litertlm` など)を使います。Documents フォルダは「ファイル」アプリからも見えるため、PC を使わずにモデルを置くこともできます。
+
+### 温度と会話の長さを測る
+
+iOS はアプリに温度の数値を公開せず、4 段階の発熱レベル（正常 / やや高い / 高い / 危険）だけを返します。`temperature.sh` は PC から USB 経由でバッテリー温度を読みます（チップの温度の代わりにはなりません。発熱レベルが「高い」になってもバッテリーは 36〜37 ℃ でした）。
+
+```bash
+bash scripts/iphone/temperature.sh        # 1 回
+bash scripts/iphone/temperature.sh 10     # 10 秒ごと
+python3 scripts/iphone/measure_turns.py gemma-4-e2b-it-q4_0                  # テキストの会話を満杯まで
+python3 scripts/iphone/measure_turns.py gemma-4-e2b-it-q4_0 --image test.png # 毎ターン画像つき
+```
+
+`measure_turns.py` は 1 ターンごとのトークン数（アプリが数えた実測値）、所要時間、バッテリー温度、発熱レベル、生成速度を表示し、途中の「最初に指示した物は?」のような質問の正解率を自動で判定します（`--save` で会話を保存、`--cooldown 分` で発熱停止のときに冷めるのを待ちます）。
+
+アプリは既定では発熱が「危険」になるまで推論を続けます（iOS は「高い」で自動的に速度を落とすだけです）。設定タブの「発熱時の動作」で、「高い」から止めるようにも変えられます。
 
 ### Hugging Face のモデルを試す
 

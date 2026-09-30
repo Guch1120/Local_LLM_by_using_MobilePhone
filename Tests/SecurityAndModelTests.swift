@@ -243,4 +243,12 @@ final class SecurityAndModelTests: XCTestCase {
         XCTAssertTrue(ThermalPolicy.shouldPause(.serious, pauseOnSerious: true))
         XCTAssertTrue(ThermalPolicy.shouldPause(.critical, pauseOnSerious: true))
     }
+
+    func testContextLengthErrorStatesBothNumbers() {
+        let error = InferenceError.contextLengthExceeded(promptTokens: 10_783, contextTokens: 8_192)
+        XCTAssertEqual(
+            error.localizedDescription,
+            "The prompt needs 10783 tokens, but the context holds 8192. Shorten it or raise the context length."
+        )
+    }
 }

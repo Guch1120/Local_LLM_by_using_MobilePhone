@@ -532,6 +532,7 @@ final class HTTPServer {
             case .requestInProgress: return ("server_busy", error.localizedDescription, 503)
             case .outOfMemory: return ("out_of_memory", error.localizedDescription, 507)
             case .thermalLimit: return ("thermal_limit", error.localizedDescription, 503)
+            case .contextLengthExceeded: return ("context_length_exceeded", error.localizedDescription, 400)
             case .generationCancelled: return ("generation_cancelled", error.localizedDescription, 499)
             }
         }
