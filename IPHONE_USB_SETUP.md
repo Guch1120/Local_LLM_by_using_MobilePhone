@@ -288,6 +288,8 @@ bash scripts/iphone/launch.sh
 bash scripts/iphone/launch.sh gemma-4-e2b-it-q4_0
 ```
 
+Screenshots are black while the phone's display is off or locked. `pymobiledevice3 developer accessibility list-items` still prints the labels of the elements on screen, which is enough to check what a screen shows.
+
 With a model ID (as listed in the app's Models screen), the app loads that model at launch. The ID is passed as a launch argument that overrides the remembered model for this launch only, so neither the API key nor a tap on the phone is needed. Stop with Ctrl-C; the app keeps running.
 
 ## 7. Recommended coding-agent workflow

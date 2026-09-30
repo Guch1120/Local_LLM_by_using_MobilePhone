@@ -122,7 +122,7 @@ final class SecurityAndModelTests: XCTestCase {
             path: "/private/var/mobile/Containers/Data/Application/OLD-UUID/Library/Application Support/Models/moved.litertlm",
             sha256: "0",
             sizeBytes: 7,
-            modalities: ["text"],
+            modalities: ["text", "image"],
             importedAt: Date()
         )
         try JSONEncoder().encode([stale]).write(to: modelDirectory.appendingPathComponent("models.json"))
@@ -130,6 +130,7 @@ final class SecurityAndModelTests: XCTestCase {
         let manager = ModelManager(directoryURL: modelDirectory)
         let models = await manager.list()
         XCTAssertEqual(models.map(\.id), ["moved"])
+        XCTAssertEqual(models.first?.modalities, ["text"])
         XCTAssertEqual(models.first?.path, modelDirectory.appendingPathComponent("moved.litertlm").path)
     }
 

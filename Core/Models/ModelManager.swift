@@ -17,6 +17,8 @@ struct InstalledModel: Codable, Identifiable, Sendable {
     var projectorURL: URL? { projectorPath.map { URL(fileURLWithPath: $0) } }
 
     /// The app container path changes across reinstalls, so resolve the file by name.
+    /// Image input needs a projector; registries written by older builds listed it for every
+    /// LiteRT-LM model, so the modalities are derived again here.
     func relocated(to directory: URL) -> InstalledModel {
         InstalledModel(
             id: id,
@@ -25,7 +27,7 @@ struct InstalledModel: Codable, Identifiable, Sendable {
             path: directory.appendingPathComponent(fileURL.lastPathComponent).path,
             sha256: sha256,
             sizeBytes: sizeBytes,
-            modalities: modalities,
+            modalities: projectorPath == nil ? ["text"] : ["text", "image"],
             importedAt: importedAt,
             projectorPath: projectorURL.map { directory.appendingPathComponent($0.lastPathComponent).path }
         )
@@ -161,7 +163,7 @@ actor ModelManager {
             path: destination.path,
             sha256: digest,
             sizeBytes: Int64(values.fileSize ?? 0),
-            modalities: fileExtension == "gguf" ? ["text"] : ["text", "image"],
+            modalities: ["text"],
             importedAt: Date()
         )
         installedModels.append(model)

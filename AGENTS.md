@@ -36,6 +36,7 @@ Use these helpers for device checks from Ubuntu:
 - iPhone logs: `bash scripts/iphone/syslog.sh`
 - HTTP API: run `bash scripts/iphone/proxy.sh` in a separate terminal (`127.0.0.1:8080 -> iPhone:8080`)
 - Screens: the app accepts launch arguments so a screen can be opened and checked with a screenshot without touching the phone, for example `APP_ARGS="-initialTab models -modelBrowserQuery gemma" bash scripts/iphone/launch.sh` (tabs: `server`, `models`, `settings`, `diagnostics`, `logs`; `-modelBrowserRepository owner/name` opens a repository's file list).
+- Screen contents: `pymobiledevice3 developer accessibility list-items` prints the labels of the elements on screen. It works when the phone's display is off or locked, where screenshots come out black.
 - Models on the phone: `GET /models` lists installed models and downloads; `POST /models/downloads` makes the phone download a file from Hugging Face.
 - App stdout/stderr: `bash scripts/iphone/launch.sh [MODEL_ID]` relaunches the app and streams its output. llama.cpp and LiteRT-LM report load errors only there. With `MODEL_ID` the app loads that model at launch, without the API key or a tap on the phone.
 - API key: `source scripts/iphone/get_api_key.sh` (reads the key copied in the app into `API_KEY`; never print it)
