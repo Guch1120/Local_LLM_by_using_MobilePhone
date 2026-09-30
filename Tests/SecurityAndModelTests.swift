@@ -232,4 +232,15 @@ final class SecurityAndModelTests: XCTestCase {
             XCTAssertEqual(result.prompt, expected)
         }
     }
+
+    func testThermalPolicyPausesOnlyAtCriticalByDefault() {
+        XCTAssertFalse(ThermalPolicy.shouldPause(.nominal, pauseOnSerious: false))
+        XCTAssertFalse(ThermalPolicy.shouldPause(.fair, pauseOnSerious: false))
+        XCTAssertFalse(ThermalPolicy.shouldPause(.serious, pauseOnSerious: false))
+        XCTAssertTrue(ThermalPolicy.shouldPause(.critical, pauseOnSerious: false))
+
+        XCTAssertFalse(ThermalPolicy.shouldPause(.fair, pauseOnSerious: true))
+        XCTAssertTrue(ThermalPolicy.shouldPause(.serious, pauseOnSerious: true))
+        XCTAssertTrue(ThermalPolicy.shouldPause(.critical, pauseOnSerious: true))
+    }
 }

@@ -9,6 +9,19 @@ enum InferenceActivity: Sendable {
     case finished(requestID: String, failed: Bool, truncated: Bool)
 }
 
+/// When the phone's thermal state makes the app refuse inference requests.
+/// iOS lowers the performance by itself when the state is `serious`, so by default only
+/// `critical` (the phone needs to cool down) pauses inference; the setting can pause at `serious`.
+enum ThermalPolicy {
+    static func shouldPause(_ state: ProcessInfo.ThermalState, pauseOnSerious: Bool) -> Bool {
+        switch state {
+        case .critical: return true
+        case .serious: return pauseOnSerious
+        default: return false
+        }
+    }
+}
+
 actor InferenceService {
     private var backend: any InferenceBackend = MockInferenceBackend()
     private var modelID = "mock-echo"
@@ -17,10 +30,16 @@ actor InferenceService {
     private let metrics: MetricsService
     private let logs: LogService
     private var observer: (@Sendable (InferenceActivity) -> Void)?
+    private var pauseOnSerious: Bool
 
-    init(metrics: MetricsService, logs: LogService) {
+    init(metrics: MetricsService, logs: LogService, pauseOnSerious: Bool = false) {
         self.metrics = metrics
         self.logs = logs
+        self.pauseOnSerious = pauseOnSerious
+    }
+
+    func setPauseOnSerious(_ value: Bool) {
+        pauseOnSerious = value
     }
 
     func setObserver(_ observer: (@Sendable (InferenceActivity) -> Void)?) {
@@ -83,13 +102,10 @@ actor InferenceService {
         if request.messages.flatMap(\.parts).contains(where: { if case .audio = $0 { return true }; return false }) && !capabilities.audio {
             throw InferenceError.unsupportedModality("audio")
         }
-        switch ProcessInfo.processInfo.thermalState {
-        case .serious, .critical:
+        if ThermalPolicy.shouldPause(ProcessInfo.processInfo.thermalState, pauseOnSerious: pauseOnSerious) {
             let state = MetricsService.thermalState
             await logs.write(.warning, event: "inference_rejected_thermal", requestID: request.id, details: state)
             throw InferenceError.thermalLimit(state)
-        default:
-            break
         }
 
         let promptTokens = request.messages

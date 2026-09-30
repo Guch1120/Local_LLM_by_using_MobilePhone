@@ -23,13 +23,13 @@ struct DiagnosticsView: View {
                     }
                 }
                 Section {
-                    metric("発熱状態", value: ThermalStateText.label(appState.metricsSnapshot?.thermalState), symbol: "thermometer.medium")
+                    metric("発熱状態", value: ThermalStateText.label(appState.metricsSnapshot?.thermalState, pauseOnSerious: appState.pauseOnSerious), symbol: "thermometer.medium")
                     metric("メモリ使用量", value: memoryText, symbol: "memorychip")
                     metric("稼働時間", value: uptimeText, symbol: "clock")
                 } header: {
                     Text("デバイス")
                 } footer: {
-                    Text(ThermalStateText.explanation)
+                    Text(ThermalStateText.explanation(pauseOnSerious: appState.pauseOnSerious))
                 }
                 Section("直前の推論") {
                     if let last = appState.metricsSnapshot?.lastInference {

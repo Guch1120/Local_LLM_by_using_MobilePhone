@@ -21,6 +21,8 @@ final class AppState: ObservableObject {
     @Published private(set) var logPersistenceStatus: LogPersistenceStatus?
     @Published var port: Int
     @Published private(set) var allowLAN: Bool
+    /// false (default): pause inference only when the thermal state is critical; true: from serious on.
+    @Published private(set) var pauseOnSerious: Bool
     @Published private(set) var defaultMaxTokens: Int
     @Published private(set) var temperature: Double
     @Published private(set) var contextTokens: Int
@@ -39,7 +41,7 @@ final class AppState: ObservableObject {
     private let metrics = MetricsService()
     private let logs: LogService
     private var inferenceDefaults: InferenceDefaults
-    private lazy var inference = InferenceService(metrics: metrics, logs: logs)
+    private lazy var inference = InferenceService(metrics: metrics, logs: logs, pauseOnSerious: pauseOnSerious)
     private var server: HTTPServer?
     private var memoryWarningObserver: NSObjectProtocol? = nil
     private var debugSessionID = UUID().uuidString
@@ -65,6 +67,7 @@ final class AppState: ObservableObject {
 
         port = (1024...65535).contains(savedPort) ? savedPort : 8080
         allowLAN = UserDefaults.standard.bool(forKey: "allowLAN")
+        pauseOnSerious = UserDefaults.standard.bool(forKey: "pauseOnSerious")
         contextTokens = configuredContextTokens
         defaultMaxTokens = configuredMaxTokens
         temperature = configuredTemperature
@@ -181,6 +184,13 @@ final class AppState: ObservableObject {
         allowLAN = enabled
         UserDefaults.standard.set(enabled, forKey: "allowLAN")
         await restartServer()
+    }
+
+    func setPauseOnSerious(_ pause: Bool) async {
+        pauseOnSerious = pause
+        UserDefaults.standard.set(pause, forKey: "pauseOnSerious")
+        await inference.setPauseOnSerious(pause)
+        await logs.write(.info, event: "thermal_policy_changed", details: pause ? "pause_from=serious" : "pause_from=critical")
     }
 
     func regenerateAPIKey() async {

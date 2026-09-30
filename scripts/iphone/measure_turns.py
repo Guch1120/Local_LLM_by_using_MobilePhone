@@ -129,7 +129,7 @@ def main() -> int:
     rows = []
     stopped_by = "max-turns"
     cooled_seconds = 0.0
-    print(f"{'turn':>4} {'prompt':>7} {'reply':>6} {'total':>6} {'+/turn':>7} {'time':>7} {'battery':>8}  {'heat':<8} finish")
+    print(f"{'turn':>4} {'prompt':>7} {'reply':>6} {'total':>6} {'+/turn':>7} {'time':>7} {'battery':>8}  {'heat':<8} {'tok/s':>6} finish")
     previous_total = 0
     temperatures = [t for t in [battery_temperature()] if t is not None]
     if temperatures:
@@ -173,9 +173,11 @@ def main() -> int:
             temperatures.append(celsius)
         _, latest = call(base, key, "/metrics", timeout=30)
         heat = str(latest.get("thermal_state", "-")) if isinstance(latest, dict) else "-"
+        speed = (latest.get("last_inference") or {}).get("decode_tokens_per_second") if isinstance(latest, dict) else None
         battery = f"{celsius:.1f}C" if celsius is not None else "-"
         print(f"{turn:>4} {usage['prompt_tokens']:>7} {usage['completion_tokens']:>6} {total:>6} "
-              f"{total - previous_total:>7} {elapsed:>6.1f}s {battery:>8}  {heat:<8} {choice['finish_reason']}")
+              f"{total - previous_total:>7} {elapsed:>6.1f}s {battery:>8}  {heat:<8} "
+              f"{(f'{speed:.1f}' if speed else '-'):>6} {choice['finish_reason']}")
         previous_total = total
         if choice["finish_reason"] == "length" and context and total >= context - 8:
             print(f"{turn:>4}  the context is full ({total}/{context} tokens)")

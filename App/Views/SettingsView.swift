@@ -76,6 +76,23 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section {
+                    Picker("推論を停止する発熱レベル", selection: Binding(
+                        get: { appState.pauseOnSerious },
+                        set: { pause in Task { await appState.setPauseOnSerious(pause) } }
+                    )) {
+                        Text("危険のときだけ").tag(false)
+                        Text("高い以上").tag(true)
+                    }
+                    Text(
+                        "発熱が「高い」になると、iOS が性能を自動で下げて端末を守ります（生成が遅くなることがあります）。"
+                            + "「危険」になると冷却が必要なため、推論を止めます。"
+                            + "「高い以上」を選ぶと、より早く止めて端末を冷やします。止めた間のリクエストは 503 で断ります。"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                } header: { Text("発熱時の動作") }
+
                 Section("推論バックエンド") {
                     LabeledContent("利用できるバックエンド", value: "Mock · LiteRT-LM · llama.cpp")
                     Text(".litertlm モデルは LiteRT-LM で動きます（GPU 優先、CPU にフォールバック、テキストのみ）。.gguf モデルは llama.cpp（Metal）で動き、mmproj ファイルがあれば画像も入力できます。")

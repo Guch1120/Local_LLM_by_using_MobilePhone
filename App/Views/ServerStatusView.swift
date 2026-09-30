@@ -25,7 +25,7 @@ struct ServerStatusView: View {
                     LabeledContent("モデル", value: appState.metricsSnapshot?.model ?? "なし")
                     LabeledContent("ロード状態", value: appState.metricsSnapshot?.modelLoaded == true ? "ロード済み" : "未ロード")
                     LabeledContent("バックエンド", value: appState.metricsSnapshot?.backend ?? "—")
-                    LabeledContent("発熱状態", value: ThermalStateText.label(appState.metricsSnapshot?.thermalState))
+                    LabeledContent("発熱状態", value: ThermalStateText.label(appState.metricsSnapshot?.thermalState, pauseOnSerious: appState.pauseOnSerious))
                     LabeledContent("メモリ", value: memoryText)
                     LabeledContent("直前の生成速度", value: speedText)
                     Button {
