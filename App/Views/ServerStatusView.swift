@@ -7,6 +7,21 @@ struct ServerStatusView: View {
         NavigationStack {
             List {
                 Section {
+                    if let live = appState.liveRequest {
+                        LiveRequestView(request: live, expanded: false)
+                        NavigationLink("全画面で表示") { LiveRequestScreen() }
+                    } else {
+                        Text("リクエストの実行中、入力テキスト・画像・出力がここに表示されます。")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("実行中のリクエスト")
+                } footer: {
+                    Text("この画面に表示するだけで、入力テキスト・画像・出力は保存もログ記録もしません。")
+                }
+
+                Section {
                     HStack(spacing: 14) {
                         Image(systemName: appState.serverRunning ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .font(.system(size: 30))
@@ -44,21 +59,6 @@ struct ServerStatusView: View {
                     }
                 } header: {
                     Text("サーバーの状態")
-                }
-
-                Section {
-                    if let live = appState.liveRequest {
-                        LiveRequestView(request: live, expanded: false)
-                        NavigationLink("全画面で表示") { LiveRequestScreen() }
-                    } else {
-                        Text("リクエストの実行中、入力テキスト・画像・出力がここに表示されます。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("実行中のリクエスト")
-                } footer: {
-                    Text("この画面に表示するだけで、入力テキスト・画像・出力は保存もログ記録もしません。")
                 }
 
                 Section("PC との接続") {
