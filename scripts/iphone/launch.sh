@@ -9,6 +9,11 @@
 #
 # MODEL_ID overrides the "last loaded model" for this launch only (it is passed
 # as a UserDefaults launch argument), so no API key or tap on the phone is needed.
+#
+# APP_ARGS adds launch arguments, for example to open a screen for a screenshot:
+#   APP_ARGS="-initialTab models" bash scripts/iphone/launch.sh
+#   APP_ARGS="-initialTab models -modelBrowserQuery gemma" bash scripts/iphone/launch.sh
+#   APP_ARGS="-initialTab models -modelBrowserRepository owner/name" bash scripts/iphone/launch.sh
 # Output is saved under artifacts/iphone/logs/. Stop with Ctrl-C; the app keeps running.
 set -euo pipefail
 
@@ -40,6 +45,10 @@ launch_arguments="$bundle_id"
 if [ -n "$model_id" ]; then
   launch_arguments="$bundle_id -lastLoadedModelID $model_id -autoLoadInProgress NO"
   echo "[INFO] Loading model at launch: $model_id"
+fi
+
+if [ -n "${APP_ARGS:-}" ]; then
+  launch_arguments="$launch_arguments $APP_ARGS"
 fi
 
 pymobiledevice3 mounter auto-mount >/dev/null 2>&1 || true

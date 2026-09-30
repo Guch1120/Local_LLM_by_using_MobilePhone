@@ -165,6 +165,7 @@ private final class HTTPConnectionSession: HTTPResponseSink {
         return switch status {
         case 200: "OK"
         case 201: "Created"
+        case 202: "Accepted"
         case 400: "Bad Request"
         case 401: "Unauthorized"
         case 404: "Not Found"
@@ -182,6 +183,14 @@ private final class HTTPConnectionSession: HTTPResponseSink {
     }
 }
 
+/// Model management that the app exposes through the API: the installed models and
+/// downloads from Hugging Face.
+struct ModelControl: Sendable {
+    let installedModels: @Sendable () async -> [InstalledModel]
+    let downloads: @Sendable () async -> [ModelDownload]
+    let startDownload: @Sendable (_ repository: String, _ path: String, _ revision: String) async throws -> ModelDownload
+}
+
 final class HTTPServer {
     private let port: UInt16
     private let apiKey: String
@@ -193,6 +202,7 @@ final class HTTPServer {
     /// Loads an installed model by ID when a chat request names a model that is not active.
     /// Returns true when that model is active afterwards.
     private let modelLoader: (@Sendable (String) async -> Bool)?
+    private let modelControl: ModelControl?
     private let queue = DispatchQueue(label: "jp.localai.iphone-server.http", qos: .userInitiated)
     private var listener: NWListener?
 
@@ -204,7 +214,8 @@ final class HTTPServer {
         inferenceDefaults: InferenceDefaults = .standard,
         metrics: MetricsService,
         logs: LogService,
-        modelLoader: (@Sendable (String) async -> Bool)? = nil
+        modelLoader: (@Sendable (String) async -> Bool)? = nil,
+        modelControl: ModelControl? = nil
     ) {
         self.port = port
         self.apiKey = apiKey
@@ -214,6 +225,7 @@ final class HTTPServer {
         self.metrics = metrics
         self.logs = logs
         self.modelLoader = modelLoader
+        self.modelControl = modelControl
     }
 
     func start() async throws {
@@ -338,6 +350,10 @@ final class HTTPServer {
             }
         case ("POST", "/v1/chat/completions"):
             await handleChat(request.body, on: session)
+        case ("GET", "/models"):
+            await handleModelList(on: session)
+        case ("POST", "/models/downloads"):
+            await handleDownloadRequest(request.body, on: session)
         default:
             let status = ["GET", "POST"].contains(request.method) ? 404 : 405
             await logs.write(.warning, event: "http_route_not_found", details: "method=\(request.method)")
@@ -503,5 +519,66 @@ final class HTTPServer {
             }
         }
         return ("backend_error", error.localizedDescription, 500)
+    }
+}
+
+// MARK: - Model management routes
+
+extension HTTPServer {
+    /// `GET /models`: the installed models and the Hugging Face downloads.
+    private func handleModelList(on session: any HTTPResponseSink) async {
+        guard let modelControl else {
+            await sendError(type: "not_available", message: "Model management is not available.", requestID: nil, status: 501, on: session)
+            return
+        }
+        let activeID = await inference.activeModel().id
+        let models = await modelControl.installedModels().map { model -> [String: Any] in
+            [
+                "id": model.id,
+                "name": model.name,
+                "backend": model.backend,
+                "size_bytes": model.sizeBytes,
+                "modalities": model.modalities,
+                "loaded": model.id == activeID
+            ]
+        }
+        let downloads = await modelControl.downloads().map { downloadPayload($0) }
+        await session.sendJSON(["models": models, "downloads": downloads], status: 200)
+    }
+
+    /// `POST /models/downloads` with `{"repository": "owner/name", "file": "model.gguf"}`.
+    private func handleDownloadRequest(_ body: Data, on session: any HTTPResponseSink) async {
+        guard let modelControl else {
+            await sendError(type: "not_available", message: "Model management is not available.", requestID: nil, status: 501, on: session)
+            return
+        }
+        guard let object = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any],
+              let repository = object["repository"] as? String, let file = object["file"] as? String else {
+            await sendError(
+                type: "invalid_request", message: "Send a JSON object with \"repository\" and \"file\".",
+                requestID: nil, status: 400, on: session
+            )
+            return
+        }
+        do {
+            let revision = object["revision"] as? String ?? "main"
+            let download = try await modelControl.startDownload(repository, file, revision)
+            await session.sendJSON(["download": downloadPayload(download)], status: 202)
+        } catch {
+            await sendError(type: "download_failed", message: error.localizedDescription, requestID: nil, status: 400, on: session)
+        }
+    }
+
+    private func downloadPayload(_ download: ModelDownload) -> [String: Any] {
+        [
+            "id": download.id.uuidString,
+            "repository": download.repository,
+            "file": download.path,
+            "state": download.state.rawValue,
+            "received_bytes": download.receivedBytes,
+            "total_bytes": download.totalBytes,
+            "error": jsonValue(download.error),
+            "model": jsonValue(download.modelID)
+        ]
     }
 }

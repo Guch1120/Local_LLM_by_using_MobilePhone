@@ -11,6 +11,7 @@ An iOS app that exposes a local, OpenAI-compatible inference API so a nearby PC 
 - A `MockInferenceBackend` for API and UI development without a model or Apple Silicon.
 - A persistent, 500-entry on-device diagnostic log with app lifecycle, model, inference, thermal, and error events. Prompt and image contents are not recorded.
 - Model file import into Application Support with a streaming SHA-256 calculation.
+- A Hugging Face model browser (Models tab → Browse Hugging Face): search repositories, see each model file's size with a memory-fit hint, and download files straight to the phone with progress, cancel and retry. `GET /models` and `POST /models/downloads` do the same from a PC.
 - Saved generation defaults for output length, temperature, LiteRT context length, and experimental Multi-Token Prediction.
 - A privacy manifest for app-local UserDefaults and model-file metadata access; no app tracking or collected data is declared.
 - CI workflows for unsigned iOS Simulator builds on pull requests and signed TestFlight uploads when repository secrets are configured.
@@ -206,6 +207,19 @@ bash scripts/iphone/push_model.sh ~/models/gemma-4-E2B-it.litertlm
 転送中は `.part` という名前で送り、完了後に名前を変えるので、転送途中のファイルが取り込まれることはありません。登録後、モデル画面で「Load」を押すと読み込まれます。iOS 向けには Hugging Face `litert-community` の汎用版(`gemma-4-E2B-it.litertlm` など)を使います。Documents フォルダは「ファイル」アプリからも見えるため、PC を使わずにモデルを置くこともできます。
 
 ### Hugging Face のモデルを試す
+
+アプリ単体でも、Models タブの「Browse Hugging Face」からモデルを検索し、ファイル(量子化)を選んでダウンロードできます。各ファイルにはサイズと「この iPhone に収まるか」の目安が表示されます。画像入力を使う場合は、モデルをダウンロードした後に同じリポジトリの「Image projectors」(mmproj)をダウンロードします。gated / private リポジトリ用のアクセストークンは Settings タブで保存できます(Keychain に保存され、huggingface.co にのみ送信されます)。ダウンロードはアプリを前面に表示している間だけ進みます。
+
+PC から同じことを行う API もあります。
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" http://127.0.0.1:8080/models | jq .        # インストール済みモデルとダウンロード状況
+curl -H "Authorization: Bearer $API_KEY" -H 'Content-Type: application/json' \
+  -d '{"repository":"Qwen/Qwen2.5-0.5B-Instruct-GGUF","file":"qwen2.5-0.5b-instruct-q4_k_m.gguf"}' \
+  http://127.0.0.1:8080/models/downloads                                             # iPhone が直接ダウンロード
+```
+
+PC 側でダウンロードして USB で転送する方法は次のとおりです(iPhone の通信量を使いません)。
 
 `hf_model.sh` はリポジトリ内のモデルファイルを一覧表示し、指定したファイルを `~/models/`(リポジトリ外)へダウンロードして iPhone に転送します。中断したダウンロードは再実行で再開されます。
 

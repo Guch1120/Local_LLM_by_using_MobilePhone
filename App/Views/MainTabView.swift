@@ -1,18 +1,26 @@
 import SwiftUI
 
 struct MainTabView: View {
+    // The `-initialTab models` launch argument opens a tab directly (see scripts/iphone/launch.sh).
+    @State private var selection = UserDefaults.standard.string(forKey: "initialTab") ?? "server"
+
     var body: some View {
-        TabView {
+        TabView(selection: $selection) {
             ServerStatusView()
                 .tabItem { Label("Server", systemImage: "dot.radiowaves.left.and.right") }
+                .tag("server")
             ModelManagerView()
                 .tabItem { Label("Models", systemImage: "shippingbox") }
+                .tag("models")
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tag("settings")
             DiagnosticsView()
                 .tabItem { Label("Diagnostics", systemImage: "waveform.path.ecg") }
+                .tag("diagnostics")
             LogsView()
                 .tabItem { Label("Logs", systemImage: "list.bullet.rectangle") }
+                .tag("logs")
         }
     }
 }

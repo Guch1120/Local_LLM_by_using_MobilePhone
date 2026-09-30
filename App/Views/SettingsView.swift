@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var multiTokenPredictionEnabled = false
     @State private var revealKey = false
     @State private var copied = false
+    @State private var huggingFaceToken = ""
 
     var body: some View {
         NavigationStack {
@@ -67,8 +68,8 @@ struct SettingsView: View {
                 }
 
                 Section("Inference backend") {
-                    LabeledContent("Available backends", value: "Mock · LiteRT-LM")
-                    Text("LiteRT-LM tries GPU first, uses CPU as a fallback, and runs image input on CPU. Device and model support still require confirmation.")
+                    LabeledContent("Available backends", value: "Mock · LiteRT-LM · llama.cpp")
+                    Text(".litertlm models run on LiteRT-LM (GPU first, CPU as a fallback, text only). .gguf models run on llama.cpp with Metal and take images when an mmproj file is installed.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     LabeledContent("MTP setting", value: multiTokenPredictionEnabled ? "Enabled" : "Disabled")
@@ -107,6 +108,23 @@ struct SettingsView: View {
                         Task { await appState.regenerateAPIKey() }
                     }
                     Text("The key is stored in Keychain. Regenerating it immediately invalidates the old key.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Hugging Face") {
+                    SecureField(appState.hasHuggingFaceToken ? "Access token saved" : "Access token (optional)", text: $huggingFaceToken)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Button("Save token") {
+                        appState.setHuggingFaceToken(huggingFaceToken)
+                        huggingFaceToken = ""
+                    }
+                    .disabled(huggingFaceToken.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if appState.hasHuggingFaceToken {
+                        Button("Remove token", role: .destructive) { appState.setHuggingFaceToken("") }
+                    }
+                    Text("Only gated or private repositories need a token. It is stored in Keychain and sent only to huggingface.co.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

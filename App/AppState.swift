@@ -27,8 +27,12 @@ final class AppState: ObservableObject {
     @Published private(set) var multiTokenPredictionEnabled: Bool
     @Published private(set) var benchmarkRunning = false
     @Published private(set) var supportsVision = false
+    @Published private(set) var downloads: [ModelDownload] = []
+    @Published private(set) var hasHuggingFaceToken = false
 
     private let keyStore = APIKeyStore()
+    private let huggingFaceTokenStore = HuggingFaceTokenStore()
+    private let downloader = ModelDownloader()
     private let modelManager = ModelManager()
     private let metrics = MetricsService()
     private let logs: LogService
@@ -74,6 +78,13 @@ final class AppState: ObservableObject {
                 await self.handleMemoryWarning()
             }
         }
+        hasHuggingFaceToken = huggingFaceTokenStore.load() != nil
+        downloader.onChange = { [weak self] in self?.downloads = $0 }
+        downloader.tokenProvider = { [huggingFaceTokenStore] in huggingFaceTokenStore.load() }
+        downloader.importer = { [weak self] url in
+            guard let self else { throw CancellationError() }
+            return try await self.importDownloadedModel(at: url)
+        }
     }
 
     var endpoint: String { "http://127.0.0.1:\(port)" }
@@ -118,7 +129,15 @@ final class AppState: ObservableObject {
                 logs: logs,
                 modelLoader: { [weak self] id in
                     await self?.loadModelOnDemand(id) ?? false
-                }
+                },
+                modelControl: ModelControl(
+                    installedModels: { [weak self] in await self?.modelManager.list() ?? [] },
+                    downloads: { [weak self] in await self?.downloads ?? [] },
+                    startDownload: { [weak self] repository, path, revision in
+                        guard let self else { throw CancellationError() }
+                        return try await self.startDownload(repository: repository, path: path, revision: revision)
+                    }
+                )
             )
             try await service.start()
             server = service
@@ -463,5 +482,58 @@ extension AppState {
         } catch {
             lastError = "Could not remove model: \(error.localizedDescription)"
         }
+    }
+}
+
+// MARK: - Hugging Face downloads
+
+@MainActor
+extension AppState {
+    var huggingFaceClient: HuggingFaceClient { HuggingFaceClient(token: huggingFaceTokenStore.load()) }
+
+    /// Starts a download chosen in the model browser.
+    func startDownload(repository: String, file: HuggingFaceFile) {
+        do {
+            try downloader.enqueue(repository: repository, path: file.path, sizeBytes: file.sizeBytes)
+            lastError = nil
+            let details = "repository=\(repository) file=\(file.path)"
+            Task { await logs.write(.info, event: "model_download_started", details: details) }
+        } catch {
+            lastError = "The download could not start: \(error.localizedDescription)"
+        }
+    }
+
+    /// Starts a download requested through the API, after checking that the file exists.
+    func startDownload(repository: String, path: String, revision: String) async throws -> ModelDownload {
+        let files = try await huggingFaceClient.modelFiles(repository: repository, revision: revision)
+        guard let file = files.first(where: { $0.path == path }) else { throw HuggingFaceError.notFound }
+        let download = try downloader.enqueue(
+            repository: repository, revision: revision, path: file.path, sizeBytes: file.sizeBytes
+        )
+        await logs.write(.info, event: "model_download_started", details: "repository=\(repository) file=\(path)")
+        return download
+    }
+
+    /// Cancels an active download or clears a finished one from the list.
+    func removeDownload(_ id: UUID) { downloader.remove(id) }
+
+    func retryDownload(_ id: UUID) { downloader.retry(id) }
+
+    /// Saves the Hugging Face access token in Keychain; an empty token removes it.
+    func setHuggingFaceToken(_ token: String) {
+        do {
+            try huggingFaceTokenStore.save(token)
+            hasHuggingFaceToken = huggingFaceTokenStore.load() != nil
+            lastError = nil
+        } catch {
+            lastError = "The Hugging Face token could not be saved: \(error.localizedDescription)"
+        }
+    }
+
+    private func importDownloadedModel(at url: URL) async throws -> String {
+        let model = try await modelManager.importModel(from: url, moveSource: true)
+        await logs.write(.info, event: "model_downloaded", details: "model=\(model.id)")
+        await refresh()
+        return model.id
     }
 }

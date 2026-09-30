@@ -4,10 +4,25 @@ import UniformTypeIdentifiers
 struct ModelManagerView: View {
     @EnvironmentObject private var appState: AppState
     @State private var showingImporter = false
+    // `-modelBrowserQuery TEXT` and `-modelBrowserRepository owner/name` launch arguments open
+    // the browser directly, so the screens can be checked from a PC without touching the phone.
+    @State private var showingBrowser = UserDefaults.standard.string(forKey: "modelBrowserQuery") != nil
+        || UserDefaults.standard.string(forKey: "modelBrowserRepository") != nil
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Button { showingBrowser = true } label: {
+                        Label("Browse Hugging Face", systemImage: "magnifyingglass")
+                    }
+                    Text("Search for GGUF or LiteRT-LM models and download them straight to this iPhone.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } header: { Text("Get models") }
+
+                ModelDownloadsSection()
+
                 Section {
                     if appState.modelImporting {
                         HStack(spacing: 10) {
@@ -62,7 +77,7 @@ struct ModelManagerView: View {
                         Label("Import from Documents folder", systemImage: "folder")
                     }
                     .disabled(appState.modelLoading || appState.modelImporting)
-                    Text("Files are copied to Application Support and hashed locally. Model downloads are not performed by this app.")
+                    Text("Files are copied to Application Support and hashed locally.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Text(
@@ -76,6 +91,12 @@ struct ModelManagerView: View {
                 Section { ErrorBanner().listRowInsets(EdgeInsets()) }
             }
             .navigationTitle("Model manager")
+            .navigationDestination(isPresented: $showingBrowser) {
+                HuggingFaceBrowserView(
+                    initialQuery: UserDefaults.standard.string(forKey: "modelBrowserQuery") ?? "",
+                    initialRepository: UserDefaults.standard.string(forKey: "modelBrowserRepository") ?? ""
+                )
+            }
             .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.data, .item], allowsMultipleSelection: true) { result in
                 switch result {
                 case let .success(urls): Task { await appState.importModels(from: urls) }

@@ -132,6 +132,59 @@ final class HTTPServerTests: XCTestCase {
         return (server, logs)
     }
 
+    func testModelRoutesReportInstalledModelsAndStartDownloads() async throws {
+        let model = InstalledModel(
+            id: "tiny", name: "Tiny", backend: "llama.cpp", path: "/tmp/tiny.gguf", sha256: "0",
+            sizeBytes: 42, modalities: ["text"], importedAt: Date()
+        )
+        let metrics = MetricsService()
+        let logs = LogService()
+        let server = HTTPServer(
+            port: 38253,
+            apiKey: "test-key",
+            allowLAN: false,
+            inference: InferenceService(metrics: metrics, logs: logs),
+            metrics: metrics,
+            logs: logs,
+            modelControl: ModelControl(
+                installedModels: { return [model] },
+                downloads: { return [] },
+                startDownload: { repository, path, revision in
+                    guard repository == "owner/name" else { throw HuggingFaceError.notFound }
+                    return ModelDownload(
+                        id: UUID(), repository: repository, revision: revision, path: path,
+                        state: .queued, receivedBytes: 0, totalBytes: 42
+                    )
+                }
+            )
+        )
+
+        let list = await dispatch(server, method: "GET", path: "/models")
+        XCTAssertEqual(list.status, 200)
+        let listBody = try XCTUnwrap(list.jsonBody as? [String: Any])
+        let models = try XCTUnwrap(listBody["models"] as? [[String: Any]])
+        XCTAssertEqual(models.first?["id"] as? String, "tiny")
+        XCTAssertEqual(models.first?["loaded"] as? Bool, false)
+        XCTAssertEqual((listBody["downloads"] as? [Any])?.count, 0)
+
+        let accepted = await dispatch(
+            server, method: "POST", path: "/models/downloads",
+            body: Data(#"{"repository":"owner/name","file":"model.gguf"}"#.utf8)
+        )
+        XCTAssertEqual(accepted.status, 202)
+        let download = try XCTUnwrap((accepted.jsonBody as? [String: Any])?["download"] as? [String: Any])
+        XCTAssertEqual(download["state"] as? String, "queued")
+        XCTAssertEqual(download["file"] as? String, "model.gguf")
+
+        let missing = await dispatch(
+            server, method: "POST", path: "/models/downloads",
+            body: Data(#"{"repository":"other/name","file":"model.gguf"}"#.utf8)
+        )
+        XCTAssertEqual(missing.status, 400)
+        let invalid = await dispatch(server, method: "POST", path: "/models/downloads", body: Data("{}".utf8))
+        XCTAssertEqual(invalid.status, 400)
+    }
+
     private func dispatch(
         _ server: HTTPServer,
         method: String,

@@ -11,7 +11,7 @@ Build a foreground iOS app that runs local text and image inference and exposes 
 - Keep model files outside the app bundle. Import them into Application Support and record a SHA-256 digest.
 - Keep camera, audio, TTS, ROS, and cloud inference out of v0.1.
 - Keep prompt text and image contents out of logs and metrics.
-- Do not add telemetry, analytics, advertising, or remote crash reporting.
+- Do not add telemetry, analytics, advertising, or remote crash reporting. The only outbound connections are to `huggingface.co`, to search and download models when the user asks for it.
 - Keep LAN exposure opt-in; do not silently expose the API to the local network.
 - Do not commit secrets, provisioning profiles, signing certificates, or model files.
 - Keep the API and errors documented when their behavior changes.
@@ -35,6 +35,8 @@ Use these helpers for device checks from Ubuntu:
 - Screenshot: `bash scripts/iphone/screenshot.sh` (latest image: `artifacts/iphone/latest.png`)
 - iPhone logs: `bash scripts/iphone/syslog.sh`
 - HTTP API: run `bash scripts/iphone/proxy.sh` in a separate terminal (`127.0.0.1:8080 -> iPhone:8080`)
+- Screens: the app accepts launch arguments so a screen can be opened and checked with a screenshot without touching the phone, for example `APP_ARGS="-initialTab models -modelBrowserQuery gemma" bash scripts/iphone/launch.sh` (tabs: `server`, `models`, `settings`, `diagnostics`, `logs`; `-modelBrowserRepository owner/name` opens a repository's file list).
+- Models on the phone: `GET /models` lists installed models and downloads; `POST /models/downloads` makes the phone download a file from Hugging Face.
 - App stdout/stderr: `bash scripts/iphone/launch.sh [MODEL_ID]` relaunches the app and streams its output. llama.cpp and LiteRT-LM report load errors only there. With `MODEL_ID` the app loads that model at launch, without the API key or a tap on the phone.
 - API key: `source scripts/iphone/get_api_key.sh` (reads the key copied in the app into `API_KEY`; never print it)
 - Hugging Face models: `bash scripts/iphone/hf_model.sh REPO` lists the model files of a repository; with file names it downloads them to `~/models/` and pushes them to the phone. `bash scripts/iphone/try_model.sh MODEL_ID ["PROMPT"] [IMAGE]` sends a test request and prints the reply and speed.
