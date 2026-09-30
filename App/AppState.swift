@@ -336,7 +336,7 @@ extension AppState {
         }
     }
 
-    /// Imports `.litertlm` files placed in the app's Documents folder (USB file transfer or Files app).
+    /// Imports model files placed in the app's Documents folder (USB file transfer or Files app).
     func importModelsFromDocuments() async {
         guard !modelImporting else { return }
         modelImporting = true

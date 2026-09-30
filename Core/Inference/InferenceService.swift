@@ -28,9 +28,10 @@ actor InferenceService {
             fileURL: model.fileURL,
             sha256: model.sha256,
             contextTokens: contextTokens,
-            multiTokenPredictionEnabled: multiTokenPredictionEnabled
+            multiTokenPredictionEnabled: multiTokenPredictionEnabled,
+            projectorURL: model.projectorURL
         )
-        let candidate = LiteRTGemmaBackend()
+        let candidate: any InferenceBackend = model.backend == "llama.cpp" ? LlamaCppBackend() : LiteRTGemmaBackend()
         let start = Date()
         try await candidate.loadModel(configuration: configuration)
         backend = candidate

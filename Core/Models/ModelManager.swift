@@ -10,8 +10,11 @@ struct InstalledModel: Codable, Identifiable, Sendable {
     let sizeBytes: Int64
     let modalities: [String]
     let importedAt: Date
+    /// Multimodal projector (mmproj) for llama.cpp GGUF models, if one was imported.
+    var projectorPath: String?
 
     var fileURL: URL { URL(fileURLWithPath: path) }
+    var projectorURL: URL? { projectorPath.map { URL(fileURLWithPath: $0) } }
 
     /// The app container path changes across reinstalls, so resolve the file by name.
     func relocated(to directory: URL) -> InstalledModel {
@@ -23,18 +26,22 @@ struct InstalledModel: Codable, Identifiable, Sendable {
             sha256: sha256,
             sizeBytes: sizeBytes,
             modalities: modalities,
-            importedAt: importedAt
+            importedAt: importedAt,
+            projectorPath: projectorURL.map { directory.appendingPathComponent($0.lastPathComponent).path }
         )
     }
 }
 
 enum ModelImportError: Error, LocalizedError {
     case unsupportedFile
+    case projectorWithoutModel
 
     var errorDescription: String? {
         switch self {
         case .unsupportedFile:
-            return "Only .litertlm model files can be imported."
+            return "Only .litertlm or .gguf model files can be imported."
+        case .projectorWithoutModel:
+            return "Import the GGUF model before its mmproj projector file."
         }
     }
 }
@@ -65,20 +72,42 @@ actor ModelManager {
 
     func list() -> [InstalledModel] { installedModels }
 
-    /// Moves `.litertlm` files from the inbox folder into Application Support and registers them.
+    private static let supportedExtensions: Set<String> = ["litertlm", "gguf"]
+
+    /// A GGUF file whose name contains "mmproj" is a multimodal projector, not a model.
+    static func isProjector(_ url: URL) -> Bool {
+        url.pathExtension.lowercased() == "gguf" && url.lastPathComponent.lowercased().contains("mmproj")
+    }
+
+    /// Moves model files from the inbox folder into Application Support and registers them.
+    /// Models are imported before projectors so a projector can attach to its model.
     func importInbox() throws -> [InstalledModel] {
         guard let inboxURL,
-              let contents = try? fileManager.contentsOfDirectory(at: inboxURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+              let contents = try? fileManager.contentsOfDirectory(
+                at: inboxURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+              )
         else { return [] }
-        return try contents
-            .filter { $0.pathExtension.lowercased() == "litertlm" }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
-            .map { try importModel(from: $0, moveSource: true) }
+        return try Self.importOrder(contents).map { try importModel(from: $0, moveSource: true) }
+    }
+
+    /// Supported files, models first and projectors last, each group by name.
+    static func importOrder(_ urls: [URL]) -> [URL] {
+        urls
+            .filter { supportedExtensions.contains($0.pathExtension.lowercased()) }
+            .sorted { lhs, rhs in
+                let lhsProjector = isProjector(lhs), rhsProjector = isProjector(rhs)
+                if lhsProjector != rhsProjector { return !lhsProjector }
+                return lhs.lastPathComponent < rhs.lastPathComponent
+            }
     }
 
     func importModel(from sourceURL: URL, moveSource: Bool = false) throws -> InstalledModel {
-        guard sourceURL.pathExtension.lowercased() == "litertlm" else {
+        let fileExtension = sourceURL.pathExtension.lowercased()
+        guard Self.supportedExtensions.contains(fileExtension) else {
             throw ModelImportError.unsupportedFile
+        }
+        if Self.isProjector(sourceURL) {
+            return try importProjector(from: sourceURL, moveSource: moveSource)
         }
         let didAccess = sourceURL.startAccessingSecurityScopedResource()
         defer { if didAccess { sourceURL.stopAccessingSecurityScopedResource() } }
@@ -86,7 +115,7 @@ actor ModelManager {
         let fileName = sourceURL.lastPathComponent
         let name = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
         let safeName = name.replacingOccurrences(of: "[^A-Za-z0-9._-]", with: "-", options: .regularExpression)
-        let temporaryURL = directoryURL.appendingPathComponent(".import-\(UUID().uuidString).litertlm")
+        let temporaryURL = directoryURL.appendingPathComponent(".import-\(UUID().uuidString).\(fileExtension)")
         defer { try? fileManager.removeItem(at: temporaryURL) }
         if moveSource {
             try fileManager.moveItem(at: sourceURL, to: temporaryURL)
@@ -109,7 +138,7 @@ actor ModelManager {
         let identifier = installedModels.contains(where: { $0.id == baseIdentifier })
             ? "\(baseIdentifier)-\(digest.prefix(10))"
             : baseIdentifier
-        let destination = directoryURL.appendingPathComponent("\(identifier).litertlm")
+        let destination = directoryURL.appendingPathComponent("\(identifier).\(fileExtension)")
         if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
         try fileManager.moveItem(at: temporaryURL, to: destination)
         // Multi-gigabyte weights can be re-imported; keep them out of device backups.
@@ -128,11 +157,11 @@ actor ModelManager {
         let model = InstalledModel(
             id: identifier,
             name: name,
-            backend: "litert-lm",
+            backend: fileExtension == "gguf" ? "llama.cpp" : "litert-lm",
             path: destination.path,
             sha256: digest,
             sizeBytes: Int64(values.fileSize ?? 0),
-            modalities: ["text", "image"],
+            modalities: fileExtension == "gguf" ? ["text"] : ["text", "image"],
             importedAt: Date()
         )
         installedModels.append(model)
@@ -146,9 +175,49 @@ actor ModelManager {
         return model
     }
 
+    /// Attaches a projector to the most recently imported GGUF model.
+    private func importProjector(from sourceURL: URL, moveSource: Bool) throws -> InstalledModel {
+        guard let index = installedModels.indices
+            .filter({ installedModels[$0].backend == "llama.cpp" })
+            .max(by: { installedModels[$0].importedAt < installedModels[$1].importedAt })
+        else { throw ModelImportError.projectorWithoutModel }
+        let didAccess = sourceURL.startAccessingSecurityScopedResource()
+        defer { if didAccess { sourceURL.stopAccessingSecurityScopedResource() } }
+
+        let target = installedModels[index]
+        let destination = directoryURL.appendingPathComponent("\(target.id).mmproj.gguf")
+        if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
+        if moveSource {
+            try fileManager.moveItem(at: sourceURL, to: destination)
+        } else {
+            try fileManager.copyItem(at: sourceURL, to: destination)
+        }
+        var backupValues = URLResourceValues()
+        backupValues.isExcludedFromBackup = true
+        var excludedDestination = destination
+        try? excludedDestination.setResourceValues(backupValues)
+
+        installedModels[index] = InstalledModel(
+            id: target.id,
+            name: target.name,
+            backend: target.backend,
+            path: target.path,
+            sha256: target.sha256,
+            sizeBytes: target.sizeBytes,
+            modalities: ["text", "image"],
+            importedAt: target.importedAt,
+            projectorPath: destination.path
+        )
+        try persist()
+        return installedModels[index]
+    }
+
     func removeModel(id: String) throws {
         guard let model = installedModels.first(where: { $0.id == id }) else { return }
         if fileManager.fileExists(atPath: model.path) { try fileManager.removeItem(atPath: model.path) }
+        if let projector = model.projectorPath, fileManager.fileExists(atPath: projector) {
+            try fileManager.removeItem(atPath: projector)
+        }
         installedModels.removeAll { $0.id == id }
         try persist()
     }

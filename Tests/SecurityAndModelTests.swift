@@ -70,6 +70,45 @@ final class SecurityAndModelTests: XCTestCase {
         XCTAssertTrue(second.isEmpty)
     }
 
+    func testInboxImportAttachesProjectorToGGUFModel() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let inbox = root.appendingPathComponent("Documents", isDirectory: true)
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        // The projector sorts first by name, but must be imported after its model.
+        try Data("projector".utf8).write(to: inbox.appendingPathComponent("mmproj-tiny-Q8_0.gguf"))
+        try Data("weights".utf8).write(to: inbox.appendingPathComponent("tiny-Q4_0.gguf"))
+        let manager = ModelManager(directoryURL: root.appendingPathComponent("Models", isDirectory: true), inboxURL: inbox)
+
+        _ = try await manager.importInbox()
+        let models = await manager.list()
+        XCTAssertEqual(models.map(\.id), ["tiny-q4_0"])
+        let model = try XCTUnwrap(models.first)
+        XCTAssertEqual(model.backend, "llama.cpp")
+        XCTAssertEqual(model.modalities, ["text", "image"])
+        let projector = try XCTUnwrap(model.projectorPath)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: projector))
+
+        try await manager.removeModel(id: model.id)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: projector))
+    }
+
+    func testProjectorWithoutGGUFModelIsRejected() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("mmproj-orphan.gguf")
+        try Data("projector".utf8).write(to: source)
+        let manager = ModelManager(directoryURL: root.appendingPathComponent("Models", isDirectory: true))
+
+        do {
+            _ = try await manager.importModel(from: source)
+            XCTFail("Expected a projector without a GGUF model to be rejected")
+        } catch let error as ModelImportError {
+            XCTAssertEqual(error.localizedDescription, ModelImportError.projectorWithoutModel.localizedDescription)
+        }
+    }
+
     func testRegistryResolvesModelsAfterContainerPathChanges() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let modelDirectory = root.appendingPathComponent("Models", isDirectory: true)
@@ -106,7 +145,7 @@ final class SecurityAndModelTests: XCTestCase {
             _ = try await manager.importModel(from: source)
             XCTFail("Expected a non-LiteRT model file to be rejected")
         } catch let error as ModelImportError {
-            XCTAssertEqual(error.localizedDescription, "Only .litertlm model files can be imported.")
+            XCTAssertEqual(error.localizedDescription, "Only .litertlm or .gguf model files can be imported.")
         }
     }
 }

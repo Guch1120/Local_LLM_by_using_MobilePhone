@@ -2,7 +2,7 @@
 {
 	archiveVersion = 1;
 	classes = {};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 		200000000000000000000001 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000001 /* AppState.swift */; };
 		200000000000000000000002 /* iPhoneLocalAIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000002 /* iPhoneLocalAIApp.swift */; };
@@ -27,6 +27,8 @@
 		200000000000000000000016 /* OpenAIRequestAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000016 /* OpenAIRequestAdapterTests.swift */; };
 		200000000000000000000017 /* SecurityAndModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000017 /* SecurityAndModelTests.swift */; };
 		200000000000000000000019 /* HTTPServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000018 /* HTTPServerTests.swift */; };
+		20000000000000000000001C /* LlamaCppBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000001B /* LlamaCppBackend.swift */; };
+		20000000000000000000001D /* LlamaFramework in Frameworks */ = {isa = PBXBuildFile; productRef = 800000000000000000000004 /* LlamaFramework */; };
 		200000000000000000000018 /* LiteRTLM in Frameworks */ = {isa = PBXBuildFile; productRef = 800000000000000000000002 /* LiteRTLM */; };
 		20000000000000000000001A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000019 /* Assets.xcassets */; };
 		20000000000000000000001B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000001A /* PrivacyInfo.xcprivacy */; };
@@ -48,6 +50,7 @@
 		100000000000000000000010 /* APIKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyStore.swift; sourceTree = "<group>"; };
 		100000000000000000000011 /* BearerTokenAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BearerTokenAuthenticator.swift; sourceTree = "<group>"; };
 		100000000000000000000012 /* LiteRTGemmaBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiteRTGemmaBackend.swift; sourceTree = "<group>"; };
+		10000000000000000000001B /* LlamaCppBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlamaCppBackend.swift; sourceTree = "<group>"; };
 		100000000000000000000013 /* MockInferenceBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockInferenceBackend.swift; sourceTree = "<group>"; };
 		100000000000000000000014 /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
 		100000000000000000000015 /* OpenAIRequestAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIRequestAdapter.swift; sourceTree = "<group>"; };
@@ -68,7 +71,8 @@
 		300000000000000000000005 /* Core */ = {isa = PBXGroup; children = (300000000000000000000006, 300000000000000000000007, 300000000000000000000008, 300000000000000000000009, 30000000000000000000000A); name = Core; path = Core; sourceTree = "<group>"; };
 		30000000000000000000000C /* LiteRT */ = {isa = PBXGroup; children = (100000000000000000000012); path = LiteRT; sourceTree = "<group>"; };
 		30000000000000000000000D /* Mock */ = {isa = PBXGroup; children = (100000000000000000000013); path = Mock; sourceTree = "<group>"; };
-		30000000000000000000000B /* Backends */ = {isa = PBXGroup; children = (30000000000000000000000C, 30000000000000000000000D); name = Backends; path = Backends; sourceTree = "<group>"; };
+		300000000000000000000011 /* LlamaCpp */ = {isa = PBXGroup; children = (10000000000000000000001B); path = LlamaCpp; sourceTree = "<group>"; };
+		30000000000000000000000B /* Backends */ = {isa = PBXGroup; children = (30000000000000000000000C, 300000000000000000000011, 30000000000000000000000D); name = Backends; path = Backends; sourceTree = "<group>"; };
 		30000000000000000000000F /* OpenAI */ = {isa = PBXGroup; children = (100000000000000000000015); path = OpenAI; sourceTree = "<group>"; };
 		30000000000000000000000E /* Server */ = {isa = PBXGroup; children = (100000000000000000000014, 30000000000000000000000F); name = Server; path = Server; sourceTree = "<group>"; };
 		300000000000000000000010 /* Tests */ = {isa = PBXGroup; children = (100000000000000000000016, 100000000000000000000017, 100000000000000000000018); name = Tests; path = Tests; sourceTree = "<group>"; };
@@ -95,8 +99,9 @@
 				200000000000000000000013,
 				200000000000000000000014,
 				200000000000000000000015,
+				20000000000000000000001C,
 			); runOnlyForDeploymentPostprocessing = 0; };
-		400000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (200000000000000000000018 /* LiteRTLM in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
+		400000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (200000000000000000000018 /* LiteRTLM in Frameworks */, 20000000000000000000001D /* LlamaFramework in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
 		400000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (20000000000000000000001A /* Assets.xcassets in Resources */, 20000000000000000000001B /* PrivacyInfo.xcprivacy in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 		400000000000000000000004 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
 				200000000000000000000016,
@@ -114,7 +119,7 @@
 			buildRules = ();
 			dependencies = ();
 			name = iPhoneLocalAI;
-			packageProductDependencies = (800000000000000000000002 /* LiteRTLM */,);
+			packageProductDependencies = (800000000000000000000002 /* LiteRTLM */, 800000000000000000000004 /* LlamaFramework */,);
 			productName = iPhoneLocalAI;
 			productReference = 900000000000000000000001 /* iPhoneLocalAI.app */;
 			productType = "com.apple.product-type.application";
@@ -135,16 +140,18 @@
 			isa = PBXProject;
 			attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; TargetAttributes = {500000000000000000000001 = {CreatedOnToolsVersion = 26.0; LastSwiftMigration = 2600; }; 500000000000000000000002 = {CreatedOnToolsVersion = 26.0; LastSwiftMigration = 2600; TestTargetID = 500000000000000000000001; }; }; };
 			buildConfigurationList = B00000000000000000000001;
-			compatibilityVersion = "Xcode 14.0";
+			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (en, Base,);
 			mainGroup = 300000000000000000000001;
-			packageReferences = (800000000000000000000001 /* XCRemoteSwiftPackageReference LiteRT-LM */,);
+			packageReferences = (800000000000000000000001 /* XCRemoteSwiftPackageReference LiteRT-LM */, 800000000000000000000003 /* XCLocalSwiftPackageReference Packages/LlamaCpp */,);
 			productRefGroup = 300000000000000000000002;
 			targets = (500000000000000000000001 /* iPhoneLocalAI */, 500000000000000000000002 /* iPhoneLocalAITests */,);
 		};
 		800000000000000000000001 /* XCRemoteSwiftPackageReference LiteRT-LM */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/google-ai-edge/LiteRT-LM"; requirement = {kind = exactVersion; version = 0.17.1; }; };
+		800000000000000000000003 /* XCLocalSwiftPackageReference Packages/LlamaCpp */ = {isa = XCLocalSwiftPackageReference; relativePath = Packages/LlamaCpp; };
+		800000000000000000000004 /* LlamaFramework */ = {isa = XCSwiftPackageProductDependency; package = 800000000000000000000003 /* XCLocalSwiftPackageReference Packages/LlamaCpp */; productName = LlamaFramework; };
 		800000000000000000000002 /* LiteRTLM */ = {isa = XCSwiftPackageProductDependency; package = 800000000000000000000001 /* XCRemoteSwiftPackageReference LiteRT-LM */; productName = LiteRTLM; };
 		600000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_VERSION = 5.0; }; name = Debug; };
 		600000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 5.0; }; name = Release; };

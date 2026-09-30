@@ -12,6 +12,7 @@ on:
       - 'App/**'
       - 'Core/**'
       - 'Backends/**'
+      - 'Packages/**'
       - 'Server/**'
       - 'Assets.xcassets/**'
       - 'PrivacyInfo.xcprivacy'

@@ -44,7 +44,7 @@ struct ModelManagerView: View {
 
                 Section {
                     if appState.installedModels.isEmpty {
-                        ContentUnavailableView("No imported models", systemImage: "shippingbox", description: Text("Import a compatible .litertlm file to register it on this device."))
+                        ContentUnavailableView("No imported models", systemImage: "shippingbox", description: Text("Import a compatible .litertlm or .gguf file to register it on this device."))
                             .listRowBackground(Color.clear)
                     } else {
                         ForEach(appState.installedModels) { model in
@@ -65,7 +65,7 @@ struct ModelManagerView: View {
                     Text("Files are copied to Application Support and hashed locally. Model downloads are not performed by this app.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Text(".litertlm files placed in this app's Documents folder (Files app or USB) are moved in automatically when the app opens.")
+                    Text(".litertlm and .gguf files placed in this app's Documents folder (Files app or USB) are moved in automatically when the app opens. A GGUF file named mmproj is attached to the most recently imported GGUF model for image input.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -101,7 +101,11 @@ struct ModelManagerView: View {
                 .textSelection(.enabled)
             HStack {
                 Label("Text", systemImage: "text.alignleft")
-                Label("Image", systemImage: "photo")
+                if model.modalities.contains("image") {
+                    Label("Image", systemImage: "photo")
+                }
+                Text(model.backend)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if appState.metricsSnapshot?.model == model.id {
                     Button("Unload") { Task { await appState.unloadModel() } }

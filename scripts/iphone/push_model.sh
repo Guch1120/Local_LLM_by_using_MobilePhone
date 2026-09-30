@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Copy a .litertlm model into the app's Documents folder over USB, then relaunch
-# the app so it moves the file into Application Support and registers it.
+# Copy model files into the app's Documents folder over USB, then relaunch the
+# app so it moves them into Application Support and registers them.
 #
 # Usage:
 #   bash scripts/iphone/push_model.sh PATH/TO/model.litertlm
+#   bash scripts/iphone/push_model.sh PATH/TO/model.gguf PATH/TO/mmproj.gguf   # llama.cpp + image input
+#
+# A GGUF file whose name contains "mmproj" is attached to the most recently
+# imported GGUF model, so pass the model before (or together with) its mmproj.
 #
 # The file is uploaded under a ".part" name and renamed only after the transfer
 # completes, so the app never imports a partially written model.
@@ -11,12 +15,16 @@
 set -euo pipefail
 
 bundle_id="jp.localai.iphone-server"
-model="${1:-}"
-
-if [ -z "$model" ] || [ ! -f "$model" ] || [[ "${model,,}" != *.litertlm ]]; then
-  echo "Usage: $0 PATH/TO/model.litertlm" >&2
+if [ "$#" -eq 0 ]; then
+  echo "Usage: $0 MODEL_FILE [MMPROJ_FILE ...]  (.litertlm or .gguf)" >&2
   exit 2
 fi
+for model in "$@"; do
+  if [ ! -f "$model" ] || [[ ! "${model,,}" =~ \.(litertlm|gguf)$ ]]; then
+    echo "[ERROR] Not a .litertlm or .gguf file: $model" >&2
+    exit 2
+  fi
+done
 
 if ! command -v pymobiledevice3 >/dev/null 2>&1; then
   echo "[ERROR] pymobiledevice3 is not installed." >&2
@@ -32,6 +40,7 @@ fi
 python_bin="$(head -1 "$(command -v pymobiledevice3)" | sed 's/^#!//')"
 [ -x "$python_bin" ] || python_bin=python3
 
+for model in "$@"; do
 echo "[INFO] Uploading $(basename "$model") ($(du -h "$model" | cut -f1)) to the app's Documents folder..."
 "$python_bin" - "$bundle_id" "$model" <<'PY'
 import asyncio
@@ -61,6 +70,7 @@ async def main(bundle_id: str, local_path: str) -> None:
 
 asyncio.run(main(sys.argv[1], sys.argv[2]))
 PY
+done
 
 if [ "${NO_LAUNCH:-0}" != "1" ]; then
   echo "[INFO] Relaunching app to import the model..."

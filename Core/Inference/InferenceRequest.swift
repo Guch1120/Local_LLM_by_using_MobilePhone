@@ -62,6 +62,7 @@ struct ModelConfiguration: Sendable {
     let sha256: String
     let contextTokens: Int
     let multiTokenPredictionEnabled: Bool
+    var projectorURL: URL?
 }
 
 enum InferenceError: Error, LocalizedError, Sendable {
