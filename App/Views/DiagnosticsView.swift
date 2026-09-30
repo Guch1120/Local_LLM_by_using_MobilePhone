@@ -22,15 +22,21 @@ struct DiagnosticsView: View {
                         Text(error).font(.footnote).foregroundStyle(.red).textSelection(.enabled)
                     }
                 }
-                Section("デバイス") {
-                    metric("発熱状態", value: appState.metricsSnapshot?.thermalState.capitalized ?? "—", symbol: "thermometer.medium")
+                Section {
+                    metric("発熱状態", value: ThermalStateText.label(appState.metricsSnapshot?.thermalState), symbol: "thermometer.medium")
                     metric("メモリ使用量", value: memoryText, symbol: "memorychip")
                     metric("稼働時間", value: uptimeText, symbol: "clock")
+                } header: {
+                    Text("デバイス")
+                } footer: {
+                    Text(ThermalStateText.explanation)
                 }
                 Section("直前の推論") {
                     if let last = appState.metricsSnapshot?.lastInference {
-                        metric("入力トークン数（推定）", value: "\(last.promptTokens)", symbol: "text.alignleft")
-                        metric("生成トークン数（推定）", value: "\(last.generatedTokens)", symbol: "text.alignleft")
+                        // llama.cpp counts tokens exactly; the other backends only estimate from word counts.
+                        let estimate = appState.metricsSnapshot?.tokenCountsEstimated == true ? "（推定）" : ""
+                        metric("入力トークン数\(estimate)", value: "\(last.promptTokens)", symbol: "text.alignleft")
+                        metric("生成トークン数\(estimate)", value: "\(last.generatedTokens)", symbol: "text.alignleft")
                         metric("最初のトークンまでの時間", value: milliseconds(last.ttftMilliseconds), symbol: "bolt")
                         metric("生成速度", value: String(format: "%.2f tok/s", last.decodeTokensPerSecond), symbol: "speedometer")
                         metric("合計時間", value: milliseconds(last.totalLatencyMilliseconds), symbol: "timer")

@@ -68,3 +68,21 @@ extension View {
             }
     }
 }
+
+/// iOS reports the device's heat in four levels and has no public temperature in degrees, so the
+/// app shows the level in words. (The PC can read the battery temperature: scripts/iphone/temperature.sh.)
+enum ThermalStateText {
+    static func label(_ state: String?) -> String {
+        switch state {
+        case "nominal": return "正常"
+        case "fair": return "やや高い"
+        case "serious": return "高い（推論を一時停止）"
+        case "critical": return "危険（推論を停止）"
+        default: return "—"
+        }
+    }
+
+    static let explanation = "iOS は端末温度の数値を公開していないため、発熱は 4 段階（正常 / やや高い / 高い / 危険）で表示します。"
+        + "「高い」以上になると、このアプリは推論を一時停止します。"
+        + "PC と USB でつないでいるときは、scripts/iphone/temperature.sh でバッテリー温度（℃）を確認できます。"
+}
