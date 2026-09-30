@@ -9,7 +9,7 @@ Use an iPhone as a local text and vision inference server for an Ubuntu PC. The 
 - SwiftUI status, model, settings, diagnostics, and log screens.
 - An `InferenceBackend` protocol between HTTP adapters and inference implementations.
 - Install models after app installation; store imports in Application Support and verify SHA-256.
-- A model browser in the Models tab searches Hugging Face by name, format and use (text, or image + text), lists the `.gguf` / `.litertlm` files of a repository with a memory-fit hint, and downloads the chosen files to the phone. A GGUF model can be downloaded together with its image projector (mmproj), which is then attached to that model.
+- A model browser in the Models tab searches Hugging Face by name, format and use (text, or image + text), lists the `.gguf` / `.litertlm` files of a repository with a memory-fit hint, and downloads the chosen files to the phone. A GGUF model can be downloaded together with its image projector (mmproj), which is then attached to that model. Multi-token-prediction helper files (`mtp-*.gguf`) are listed as not usable on their own: llama.cpp only loads them next to their main model, which the app does not support.
 - OpenAI-compatible `GET /v1/models` and `POST /v1/chat/completions`, including text, JPEG/PNG base64 data URLs, and SSE streaming.
 - Authenticated management routes: `/capabilities`, `/metrics`, and `/logs`; `/health` reports basic liveness.
 - Keychain-backed bearer token, foreground HTTP server, memory and thermal diagnostics, request timing, and privacy-preserving ring-buffer logs.
@@ -51,6 +51,7 @@ An image adds to the time before the first token (encoding the picture and evalu
 - `GET /models` lists the installed models (`id`, `name`, `backend`, `size_bytes`, `modalities`, `loaded`) and the Hugging Face downloads (`id`, `repository`, `file`, `state`, `received_bytes`, `total_bytes`, `error`, `model`). `POST /models/downloads` with `{"repository": "owner/name", "file": "model.gguf"}` (optional `revision`) queues a download and answers `202` with the download; an unknown repository or file, a file that is not a model, or too little free storage answers `400` with `download_failed`. States are `queued`, `downloading`, `importing`, `completed`, `failed`; downloads run one at a time, only while the app is in the foreground, and a failed download can be retried in the app.
 - The app contacts `huggingface.co` only to search and download models when the user (or an API client) asks for it. An optional access token for gated repositories is stored in Keychain and sent only to Hugging Face. Inference data never leaves the device.
 - Logs omit prompt and image contents.
+- The Server tab shows the request that is running or ran last: the last user message, its images, and the reply as it is generated, with the time to the first token and the generation speed. This live view exists only on the screen and in memory; it is replaced by the next request and is never written to logs, metrics or storage.
 - The current mock backend is named `mock-echo`; compatible `.litertlm` files are loaded through LiteRT-LM (text inference verified on device; image input see Current stage).
 
 ## Staged implementation

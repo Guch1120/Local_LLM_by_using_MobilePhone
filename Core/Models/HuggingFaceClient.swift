@@ -80,6 +80,9 @@ struct HuggingFaceFile: Identifiable, Sendable, Equatable {
     /// The model ID the app assigns after import: the lower-cased file name without its extension.
     var baseName: String { (fileName as NSString).deletingPathExtension }
     var isProjector: Bool { ModelManager.isProjector(URL(fileURLWithPath: fileName)) }
+    /// Multi-token-prediction drafters ("mtp-...") only work next to their main model, which this
+    /// app does not support; llama.cpp refuses to load them on their own.
+    var isDrafter: Bool { fileName.lowercased().hasPrefix("mtp-") }
 }
 
 /// A rough "will it run" hint from the file size and the device's memory.

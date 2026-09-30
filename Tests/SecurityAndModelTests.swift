@@ -177,6 +177,37 @@ final class SecurityAndModelTests: XCTestCase {
         }
     }
 
+    func testInferenceServiceReportsRunningRequestsInOrder() async throws {
+        let service = InferenceService(metrics: MetricsService(), logs: LogService())
+        let (activities, continuation) = AsyncStream.makeStream(of: InferenceActivity.self)
+        await service.setObserver { continuation.yield($0) }
+        let request = InferenceRequest(
+            id: "live-1", model: "mock-echo",
+            messages: [InferenceMessage(role: .user, parts: [.text("hello there")])],
+            maxTokens: 16, temperature: 0
+        )
+
+        var reply = ""
+        for try await chunk in try await service.generate(request) { reply += chunk.text }
+
+        var events: [String] = []
+        var reported = ""
+        loop: for await activity in activities {
+            switch activity {
+            case let .started(started):
+                events.append("started \(started.id)")
+            case let .text(_, text):
+                reported += text
+            case let .finished(requestID, failed):
+                events.append("finished \(requestID) failed=\(failed)")
+                break loop
+            }
+        }
+        XCTAssertEqual(events, ["started live-1", "finished live-1 failed=false"])
+        XCTAssertEqual(reported, reply)
+        XCTAssertEqual(reply, "Mock response: hello there")
+    }
+
     func testTemplateFormatterAppliesChatMLAndKeepsImageOrder() {
         let image = ImageInput(data: Data([1, 2, 3]), mimeType: "image/png")
         let messages = [

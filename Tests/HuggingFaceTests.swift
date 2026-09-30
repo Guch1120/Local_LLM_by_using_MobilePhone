@@ -36,6 +36,8 @@ final class HuggingFaceTests: XCTestCase {
         XCTAssertEqual(files[1].fileName, "model-Q4_0.GGUF")
         XCTAssertEqual(files[1].baseName, "model-Q4_0")
         XCTAssertEqual(files.map(\.isProjector), [false, false, false, true])
+        XCTAssertEqual(files.map(\.isDrafter), [false, false, false, false])
+        XCTAssertTrue(HuggingFaceFile(path: "MTP/mtp-gemma-4-E4B-it-Q4_0.gguf", sizeBytes: 59_000_000).isDrafter)
     }
 
     func testURLsAreBuiltOnlyForValidRepositoriesAndModelFiles() {

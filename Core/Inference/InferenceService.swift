@@ -1,5 +1,13 @@
 import Foundation
 
+/// What a running request is doing, for the live view on the phone's screen.
+/// It carries the prompt and the generated text, so it must never be logged or stored.
+enum InferenceActivity: Sendable {
+    case started(InferenceRequest)
+    case text(requestID: String, String)
+    case finished(requestID: String, failed: Bool)
+}
+
 actor InferenceService {
     private var backend: any InferenceBackend = MockInferenceBackend()
     private var modelID = "mock-echo"
@@ -7,10 +15,15 @@ actor InferenceService {
     private var generationInProgress = false
     private let metrics: MetricsService
     private let logs: LogService
+    private var observer: (@Sendable (InferenceActivity) -> Void)?
 
     init(metrics: MetricsService, logs: LogService) {
         self.metrics = metrics
         self.logs = logs
+    }
+
+    func setObserver(_ observer: (@Sendable (InferenceActivity) -> Void)?) {
+        self.observer = observer
     }
 
     func activeModel() -> (id: String?, backend: String, loaded: Bool) {
@@ -85,6 +98,8 @@ actor InferenceService {
             .split(whereSeparator: \.isWhitespace).count
         let generationStartedAt = Date()
         generationInProgress = true
+        let observer = observer
+        observer?(.started(request))
         await metrics.beginRequest()
         await logs.write(.info, event: "inference_started", requestID: request.id, details: "backend=\(backend.identifier)")
 
@@ -113,6 +128,7 @@ actor InferenceService {
                         if !chunk.text.isEmpty {
                             firstTokenAt = firstTokenAt ?? Date()
                             generatedTokens += chunk.text.split(whereSeparator: \.isWhitespace).count
+                            observer?(.text(requestID: request.id, chunk.text))
                         }
                         continuation.yield(chunk)
                     }
@@ -156,6 +172,7 @@ actor InferenceService {
         failed: Bool
     ) async {
         generationInProgress = false
+        observer?(.finished(requestID: requestID, failed: failed))
         await metrics.finishRequest(
             promptTokens: promptTokens,
             generatedTokens: generatedTokens,

@@ -11,6 +11,7 @@ An iOS app that exposes a local, OpenAI-compatible inference API so a nearby PC 
 - A `MockInferenceBackend` for API and UI development without a model or Apple Silicon.
 - A persistent, 500-entry on-device diagnostic log with app lifecycle, model, inference, thermal, and error events. Prompt and image contents are not recorded.
 - Model file import into Application Support with a streaming SHA-256 calculation.
+- A live view on the Server tab that shows the running request on the phone: the prompt, the input image and the reply as it streams. It is not stored or logged.
 - A Hugging Face model browser (Models tab → Browse Hugging Face): search repositories, see each model file's size with a memory-fit hint, and download files straight to the phone with progress, cancel and retry. `GET /models` and `POST /models/downloads` do the same from a PC.
 - Saved generation defaults for output length, temperature, LiteRT context length, and experimental Multi-Token Prediction.
 - A privacy manifest for app-local UserDefaults and model-file metadata access; no app tracking or collected data is declared.

@@ -29,6 +29,8 @@ final class AppState: ObservableObject {
     @Published private(set) var supportsVision = false
     @Published private(set) var downloads: [ModelDownload] = []
     @Published private(set) var hasHuggingFaceToken = false
+    /// The request that is running or ran last, for the live view. Kept in memory only.
+    @Published private(set) var liveRequest: LiveRequest?
 
     private let keyStore = APIKeyStore()
     private let huggingFaceTokenStore = HuggingFaceTokenStore()
@@ -79,6 +81,12 @@ final class AppState: ObservableObject {
             }
         }
         hasHuggingFaceToken = huggingFaceTokenStore.load() != nil
+        // A stream keeps the events in order on their way to the main actor.
+        let (activities, continuation) = AsyncStream.makeStream(of: InferenceActivity.self)
+        Task { [weak self] in
+            await self?.inference.setObserver { continuation.yield($0) }
+            for await activity in activities { self?.apply(activity) }
+        }
         downloader.onChange = { [weak self] in self?.downloads = $0 }
         downloader.tokenProvider = { [huggingFaceTokenStore] in huggingFaceTokenStore.load() }
         downloader.importer = { [weak self] url, projectorTarget in
@@ -482,6 +490,24 @@ extension AppState {
             await refresh()
         } catch {
             lastError = "Could not remove model: \(error.localizedDescription)"
+        }
+    }
+}
+
+// MARK: - Live request
+
+@MainActor
+extension AppState {
+    private func apply(_ activity: InferenceActivity) {
+        switch activity {
+        case let .started(request):
+            liveRequest = LiveRequest(request)
+        case let .text(requestID, text):
+            guard liveRequest?.id == requestID else { return }
+            liveRequest?.append(text)
+        case let .finished(requestID, failed):
+            guard liveRequest?.id == requestID else { return }
+            liveRequest?.finish(failed: failed)
         }
     }
 }

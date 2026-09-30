@@ -166,7 +166,7 @@ struct HuggingFaceRepositoryView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            let models = files.filter { !$0.isProjector }
+            let models = files.filter { !$0.isProjector && !$0.isDrafter }
             if !models.isEmpty {
                 Section {
                     ForEach(models) { file in fileRow(file) }
@@ -186,6 +186,26 @@ struct HuggingFaceRepositoryView: View {
                     Text(
                         "Image input needs the model and a projector. The model's download menu adds one; "
                             + "a projector downloaded here attaches to the most recently installed GGUF model."
+                    )
+                }
+            }
+            let drafters = files.filter { $0.isDrafter && !$0.isProjector }
+            if !drafters.isEmpty {
+                Section {
+                    ForEach(drafters) { file in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(file.fileName).font(.subheadline)
+                            Text(ByteCountFormatter.string(fromByteCount: file.sizeBytes, countStyle: .file))
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Not usable on their own")
+                } footer: {
+                    Text(
+                        "MTP files are small helper models that speed up their main model. "
+                            + "This app cannot load them, so they are not offered for download."
                     )
                 }
             }

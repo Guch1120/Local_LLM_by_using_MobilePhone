@@ -10,7 +10,7 @@ Build a foreground iOS app that runs local text and image inference and exposes 
 - Do not reference LiteRT-LM from HTTP handlers, views, or model registry code.
 - Keep model files outside the app bundle. Import them into Application Support and record a SHA-256 digest.
 - Keep camera, audio, TTS, ROS, and cloud inference out of v0.1.
-- Keep prompt text and image contents out of logs and metrics.
+- Keep prompt text and image contents out of logs and metrics. The live request view on the Server tab may show them on screen, from memory only.
 - Do not add telemetry, analytics, advertising, or remote crash reporting. The only outbound connections are to `huggingface.co`, to search and download models when the user asks for it.
 - Keep LAN exposure opt-in; do not silently expose the API to the local network.
 - Do not commit secrets, provisioning profiles, signing certificates, or model files.

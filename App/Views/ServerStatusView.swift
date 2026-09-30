@@ -46,6 +46,21 @@ struct ServerStatusView: View {
                     Text("Server status")
                 }
 
+                Section {
+                    if let live = appState.liveRequest {
+                        LiveRequestView(request: live, expanded: false)
+                        NavigationLink("Open full view") { LiveRequestScreen() }
+                    } else {
+                        Text("The prompt, the image and the reply appear here while a request runs.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Live request")
+                } footer: {
+                    Text("Shown on this screen only. Prompts, images and replies are not stored or logged.")
+                }
+
                 Section("PC connection") {
                     LabeledContent("USB endpoint", value: "127.0.0.1:\(appState.port)")
                     Text("On Ubuntu, forward the device port with `iproxy \(appState.port):\(appState.port)`, then connect to this address.")
