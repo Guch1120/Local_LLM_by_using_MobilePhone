@@ -10,7 +10,7 @@ fail() { printf '[FAIL] %s\n' "$*"; failures=$((failures + 1)); }
 
 printf '=== iPhone USB development check ===\n'
 
-for cmd in pymobiledevice3 idevice_id lsusb systemctl; do
+for cmd in pymobiledevice3 lsusb systemctl; do
   if command -v "$cmd" >/dev/null 2>&1; then
     ok "Found command: $cmd"
   else
@@ -18,11 +18,14 @@ for cmd in pymobiledevice3 idevice_id lsusb systemctl; do
   fi
 done
 
-if command -v iproxy >/dev/null 2>&1; then
-  ok "Found command: iproxy"
-else
-  warn "iproxy not found (install package: libusbmuxd-tools)"
-fi
+# The helper scripts fall back to pymobiledevice3 when these are missing.
+for cmd in idevice_id iproxy; do
+  if command -v "$cmd" >/dev/null 2>&1; then
+    ok "Found command: $cmd"
+  else
+    printf '[INFO] %s not found; using pymobiledevice3 instead (optional: sudo apt install libimobiledevice-utils libusbmuxd-tools)\n' "$cmd"
+  fi
+done
 
 if systemctl is-active --quiet usbmuxd 2>/dev/null; then
   ok "usbmuxd is active"

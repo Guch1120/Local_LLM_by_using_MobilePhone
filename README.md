@@ -15,7 +15,7 @@ An iOS app that exposes a local, OpenAI-compatible inference API so a nearby PC 
 - A privacy manifest for app-local UserDefaults and model-file metadata access; no app tracking or collected data is declared.
 - CI workflows for unsigned iOS Simulator builds on pull requests and signed TestFlight uploads when repository secrets are configured.
 
-The app starts with the mock backend. LiteRT-LM is isolated behind `InferenceBackend` and pinned to Google's official Swift package v0.17.1. The adapter attempts Metal first and falls back to CPU if engine initialization fails. Text inference with Gemma 4 E2B on the Metal GPU backend has been verified on an iPhone 16 Pro Max. LiteRT-LM 0.17.1's vision encoder does not run on iOS (see SPEC.md), so image input uses a second backend: llama.cpp (MIT, official Apple XCFramework `b10456` with libmtmd — the last release that still ships the iOS Simulator slice, pinned in `Packages/LlamaCpp`). `.gguf` models run on llama.cpp with Metal; an `mmproj` GGUF imported after its model enables images. The LiteRT-LM package is distributed under Apache-2.0.
+The app starts with the mock backend. LiteRT-LM is isolated behind `InferenceBackend` and pinned to Google's official Swift package v0.17.1. The adapter attempts Metal first and falls back to CPU if engine initialization fails. Text inference with Gemma 4 E2B on the Metal GPU backend has been verified on an iPhone 16. LiteRT-LM 0.17.1's vision encoder does not run on iOS (see SPEC.md), so image input uses a second backend: llama.cpp (MIT, official Apple XCFramework `b10456` with libmtmd — the last release that still ships the iOS Simulator slice, pinned in `Packages/LlamaCpp`). `.gguf` models run on llama.cpp with Metal; an `mmproj` GGUF imported after its model enables images. Gemma 4 uses its own prompt format; other GGUF models use the chat template stored in the file (ChatML when llama.cpp does not recognize it), so models from Hugging Face can be tried without app changes. The LiteRT-LM package is distributed under Apache-2.0.
 
 For Gemma 4 E2B with image input, use `ggml-org/gemma-4-E2B-it-GGUF` (Apache-2.0):
 
@@ -95,8 +95,11 @@ scripts/iphone/
   syslog.sh       # iPhoneのsystem logを取得
   proxy.sh        # USB経由でPC側ポートをiPhoneへ転送
   get_api_key.sh  # iPhoneのクリップボードからAPIキーを読み込む
+  launch.sh       # アプリを再起動して標準出力・標準エラーを表示(モデル指定で起動時にロード)
   install_dev_build.sh  # CIの開発ビルドをUSBでインストールして起動
-  push_model.sh   # .litertlmモデルをUSBでアプリへ転送して取り込む
+  push_model.sh   # .litertlm / .gguf モデルをUSBでアプリへ転送して取り込む
+  hf_model.sh     # Hugging Face からモデルをダウンロードして転送
+  try_model.sh    # モデルにテストリクエストを送り、応答と速度を表示
 ```
 
 初回セットアップ手順は [IPHONE_USB_SETUP.md](IPHONE_USB_SETUP.md) を参照してください。Developer Mode の有効化と DeveloperDiskImage のマウントまで完了していれば、通常は次のコマンドで接続状態を確認できます。
@@ -123,6 +126,15 @@ bash scripts/iphone/syslog.sh
 ```bash
 bash scripts/iphone/syslog.sh "iPhoneLocalAI"
 ```
+
+モデルのロードに失敗した理由を調べる場合(llama.cpp / LiteRT-LM のエラーは標準エラーにしか出ません):
+
+```bash
+bash scripts/iphone/launch.sh                       # アプリを再起動して出力を表示
+bash scripts/iphone/launch.sh gemma-4-e2b-it-q4_0   # 起動時に指定モデルをロード
+```
+
+モデルIDを指定すると、その起動に限り「前回ロードしたモデル」を上書きするので、APIキーも iPhone の操作も不要です。出力は `artifacts/iphone/logs/` にも保存されます。
 
 OpenAI互換HTTP APIへUSB経由で接続する場合は、別ターミナルで次を起動したままにします。
 
@@ -166,7 +178,7 @@ curl \
 
 開発中はTestFlightを経由せず、`iOS dev build` ワークフロー(`.github/workflows/dev-build.yml`)が作る開発署名の IPA を USB で直接インストールします。`iphone` ブランチへの push のうち、アプリに含まれるファイル(`App/` `Core/` `Backends/` `Server/` `Assets.xcassets/` プロジェクト設定など)が変わったときだけ自動実行され、手動実行もできます。
 
-GitHub Actions の macOS ランナーは Linux の約10倍の速さで無料枠の分数を消費し、private リポジトリでは利用枠を超えるとジョブが開始されなくなります。そのため、単体テスト(`iOS pull request`)は PR 作成時と手動実行時のみ走ります。TestFlight に出す前などは次で手動実行してください。
+macOS ランナーのジョブは時間がかかるため(private リポジトリでは Linux の約10倍の速さで無料枠も消費します)、単体テスト(`iOS pull request`)は PR 作成時と手動実行時のみ走ります。TestFlight に出す前などは次で手動実行してください。
 
 ```bash
 gh workflow run pull-request.yml --ref iphone
@@ -185,13 +197,26 @@ IPA は `artifacts/iphone/builds/<run id>/` に保存されます。開発署名
 
 ### モデルを USB で転送する
 
-`.litertlm` モデルはアプリに同梱せず、USB でアプリの Documents フォルダへ転送します。アプリは起動時(またはモデル画面の「Import from Documents folder」)に Documents 内の `.litertlm` を Application Support へ移動し、SHA-256 を記録して登録します。
+モデル(`.litertlm` / `.gguf`)はアプリに同梱せず、USB でアプリの Documents フォルダへ転送します。アプリは起動時(またはモデル画面の「Import from Documents folder」)に Documents 内のモデルを Application Support へ移動し、SHA-256 を記録して登録します。
 
 ```bash
 bash scripts/iphone/push_model.sh ~/models/gemma-4-E2B-it.litertlm
 ```
 
 転送中は `.part` という名前で送り、完了後に名前を変えるので、転送途中のファイルが取り込まれることはありません。登録後、モデル画面で「Load」を押すと読み込まれます。iOS 向けには Hugging Face `litert-community` の汎用版(`gemma-4-E2B-it.litertlm` など)を使います。Documents フォルダは「ファイル」アプリからも見えるため、PC を使わずにモデルを置くこともできます。
+
+### Hugging Face のモデルを試す
+
+`hf_model.sh` はリポジトリ内のモデルファイルを一覧表示し、指定したファイルを `~/models/`(リポジトリ外)へダウンロードして iPhone に転送します。中断したダウンロードは再実行で再開されます。
+
+```bash
+bash scripts/iphone/hf_model.sh Qwen/Qwen2.5-0.5B-Instruct-GGUF                                     # ファイル一覧
+bash scripts/iphone/hf_model.sh Qwen/Qwen2.5-0.5B-Instruct-GGUF qwen2.5-0.5b-instruct-q4_k_m.gguf   # ダウンロードして転送
+bash scripts/iphone/try_model.sh qwen2.5-0.5b-instruct-q4_k_m "日本の首都は？"                        # テスト(要 API_KEY と proxy.sh)
+bash scripts/iphone/try_model.sh gemma-4-e2b-it-q4_0 "何が写っていますか？" test.png                  # 画像つき
+```
+
+モデルIDはファイル名から拡張子を除いて小文字にしたものです。画像入力には、モデルと一緒に名前に `mmproj` を含む GGUF を指定します。gated / private リポジトリは環境変数 `HF_TOKEN` にトークンを設定してください。ロードに失敗したときは `GET /logs` の `model_load_failed` に llama.cpp のエラーが記録され、`launch.sh MODEL_ID` で全出力を確認できます。iPhone 16(メモリ 8GB)では、量子化後 3GB 前後までのモデルが目安です。
 
 TestFlight(`TestFlight` ワークフロー、手動実行)は、開発ビルドで確認できた変更を配布・共有するときに使います。
 

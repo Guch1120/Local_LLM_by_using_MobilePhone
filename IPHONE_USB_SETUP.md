@@ -32,6 +32,14 @@ sudo apt install -y \
 python3 -m pip install --user -U pymobiledevice3
 ```
 
+Only `pymobiledevice3` is required by the helper scripts. On a PC where `sudo` is not available, skip the `apt` packages if `usbmuxd` is already running (`systemctl is-active usbmuxd`): the scripts then use `pymobiledevice3` for port forwarding and syslog instead of `iproxy` and `idevicesyslog`. To keep it apart from other Python packages, it can also be installed into its own virtual environment:
+
+```bash
+python3 -m venv ~/.local/share/pymobiledevice3-venv
+~/.local/share/pymobiledevice3-venv/bin/pip install -U pymobiledevice3
+ln -sf ~/.local/share/pymobiledevice3-venv/bin/pymobiledevice3 ~/.local/bin/pymobiledevice3
+```
+
 If `pymobiledevice3` is not found after installation, ensure `~/.local/bin` is in `PATH`:
 
 ```bash
@@ -170,6 +178,9 @@ scripts/iphone/
   screenshot.sh
   syslog.sh
   proxy.sh
+  launch.sh
+  hf_model.sh
+  try_model.sh
 ```
 
 Run them with `bash` on any checkout:
@@ -240,7 +251,7 @@ Stop with Ctrl-C.
 
 ### proxy.sh
 
-Forwards a local Ubuntu TCP port to the same port on the iPhone through usbmuxd.
+Forwards a local Ubuntu TCP port to the same port on the iPhone through usbmuxd. It uses `iproxy` when installed and `pymobiledevice3 usbmux forward` otherwise.
 
 Default:
 
@@ -267,6 +278,17 @@ curl http://127.0.0.1:8080/health
 ```
 
 Keep `proxy.sh` running while the host accesses the iPhone API. The iPhone app must also be open in the foreground with its HTTP server started; otherwise `curl` will report connection refused even if USB pairing is healthy.
+
+### launch.sh
+
+Relaunches the app and streams its stdout/stderr, which is where llama.cpp and LiteRT-LM report why a model failed to load. The output is also saved under `artifacts/iphone/logs/`.
+
+```bash
+bash scripts/iphone/launch.sh
+bash scripts/iphone/launch.sh gemma-4-e2b-it-q4_0
+```
+
+With a model ID (as listed in the app's Models screen), the app loads that model at launch. The ID is passed as a launch argument that overrides the remembered model for this launch only, so neither the API key nor a tap on the phone is needed. Stop with Ctrl-C; the app keeps running.
 
 ## 7. Recommended coding-agent workflow
 
