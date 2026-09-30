@@ -73,17 +73,6 @@ struct LiveRequestView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                if request.state == .generating { ProgressView() }
-                Text(statusText)
-                    .font(.caption)
-                    .foregroundStyle(request.state == .failed || request.state == .truncated ? Color.orange : Color.secondary)
-                Spacer()
-                Text(request.model)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
             if !request.images.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -121,6 +110,28 @@ struct LiveRequestView: View {
             .font(.callout)
             .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
+    }
+}
+
+/// State, timing and model of a request. It stays in view while the reply scrolls.
+struct LiveRequestStatusBar: View {
+    let request: LiveRequest
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if request.state == .generating { ProgressView() }
+            Text(statusText)
+                .font(.caption)
+                .foregroundStyle(request.state == .failed || request.state == .truncated ? Color.orange : Color.secondary)
+            Spacer()
+            Text(request.model)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 
     private var statusText: String {
@@ -166,7 +177,11 @@ struct LiveOutputView: View {
                 }
                 .onChange(of: appState.liveRequest?.output) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let live = appState.liveRequest { LiveRequestStatusBar(request: live) }
+            }
             .navigationTitle("出力")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
