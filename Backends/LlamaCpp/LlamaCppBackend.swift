@@ -76,9 +76,10 @@ actor LlamaCppBackend: InferenceBackend {
 }
 
 enum LlamaError: Error, LocalizedError {
-    case modelLoadFailed
-    case contextInitFailed
-    case projectorLoadFailed
+    /// The load failures carry llama.cpp's own last warnings and errors, when it logged any.
+    case modelLoadFailed(String?)
+    case contextInitFailed(String?)
+    case projectorLoadFailed(String?)
     case imageDecodeFailed
     case tokenizeFailed(Int32)
     case promptTooLong(Int, Int)
@@ -86,15 +87,74 @@ enum LlamaError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .modelLoadFailed: return "llama.cpp could not load the GGUF model."
-        case .contextInitFailed: return "llama.cpp could not create an inference context."
-        case .projectorLoadFailed: return "llama.cpp could not load the multimodal projector (mmproj)."
+        case let .modelLoadFailed(reason):
+            return Self.describe("llama.cpp could not load the GGUF model.", reason)
+        case let .contextInitFailed(reason):
+            return Self.describe("llama.cpp could not create an inference context.", reason)
+        case let .projectorLoadFailed(reason):
+            return Self.describe("llama.cpp could not load the multimodal projector (mmproj).", reason)
         case .imageDecodeFailed: return "The image could not be decoded for the vision encoder."
         case let .tokenizeFailed(code): return "Prompt tokenization failed (\(code))."
         case let .promptTooLong(tokens, limit):
             return "The prompt needs \(tokens) tokens, but the context holds \(limit). Shorten it or raise the context length."
         case let .decodeFailed(code): return "llama.cpp decoding failed (\(code))."
         }
+    }
+
+    private static func describe(_ message: String, _ reason: String?) -> String {
+        reason.map { "\(message) \($0)" } ?? message
+    }
+}
+
+/// Keeps llama.cpp's most recent warnings and errors so a failed load can report its cause.
+/// llama.cpp writes them only to stderr, which nobody sees on a device without a debugger.
+enum LlamaLogCapture {
+    private static let lock = NSLock()
+    private static var lines: [String] = []
+    private static var pending = ""
+    private static var pendingLevel = GGML_LOG_LEVEL_NONE
+    private static let capacity = 8
+
+    /// Routes llama.cpp and mtmd logging through the capture. Output still goes to stderr.
+    static let install: Void = {
+        let callback: ggml_log_callback = { level, text, _ in
+            guard let text else { return }
+            fputs(text, stderr)
+            LlamaLogCapture.record(level: level, text: String(cString: text))
+        }
+        llama_log_set(callback, nil)
+        mtmd_helper_log_set(callback, nil)
+    }()
+
+    static func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        lines.removeAll()
+        pending = ""
+    }
+
+    /// The last captured warnings and errors, oldest first, or nil if there were none.
+    static func summary() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lines.isEmpty ? nil : String(lines.suffix(3).joined(separator: " | ").prefix(600))
+    }
+
+    private static func record(level: ggml_log_level, text: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        // GGML_LOG_LEVEL_CONT continues the previous message and keeps its level.
+        if level.rawValue != GGML_LOG_LEVEL_CONT.rawValue { pendingLevel = level }
+        let keep = pendingLevel.rawValue == GGML_LOG_LEVEL_WARN.rawValue
+            || pendingLevel.rawValue == GGML_LOG_LEVEL_ERROR.rawValue
+        guard keep else { return }
+        pending += text
+        while let newline = pending.firstIndex(of: "\n") {
+            let line = pending[..<newline].trimmingCharacters(in: .whitespaces)
+            pending = String(pending[pending.index(after: newline)...])
+            if !line.isEmpty { lines.append(line) }
+        }
+        if lines.count > capacity { lines.removeFirst(lines.count - capacity) }
     }
 }
 
@@ -107,17 +167,23 @@ final class LlamaRuntime: @unchecked Sendable {
     private let multimodal: OpaquePointer?
     private let batchSize: Int32
     private let contextSize: Int
+    private let chatTemplate: String?
+    private let usesGemma4Template: Bool
 
     var supportsVision: Bool { multimodal.map { mtmd_support_vision($0) } ?? false }
 
-    private static let backendInit: Void = llama_backend_init()
+    private static let backendInit: Void = {
+        _ = LlamaLogCapture.install
+        llama_backend_init()
+    }()
 
     init(modelPath: String, projectorPath: String?, contextTokens: Int) throws {
         _ = Self.backendInit
+        LlamaLogCapture.reset()
         var modelParams = llama_model_default_params()
         modelParams.n_gpu_layers = 999
         guard let model = llama_model_load_from_file(modelPath, modelParams) else {
-            throw LlamaError.modelLoadFailed
+            throw LlamaError.modelLoadFailed(LlamaLogCapture.summary())
         }
         let threads = Int32(max(2, min(6, ProcessInfo.processInfo.activeProcessorCount - 2)))
         var contextParams = llama_context_default_params()
@@ -128,7 +194,7 @@ final class LlamaRuntime: @unchecked Sendable {
         contextParams.n_threads_batch = threads
         guard let context = llama_init_from_model(model, contextParams) else {
             llama_model_free(model)
-            throw LlamaError.contextInitFailed
+            throw LlamaError.contextInitFailed(LlamaLogCapture.summary())
         }
         var multimodal: OpaquePointer?
         if let projectorPath {
@@ -139,7 +205,7 @@ final class LlamaRuntime: @unchecked Sendable {
             guard let created = mtmd_init_from_file(projectorPath, model, mtmdParams) else {
                 llama_free(context)
                 llama_model_free(model)
-                throw LlamaError.projectorLoadFailed
+                throw LlamaError.projectorLoadFailed(LlamaLogCapture.summary())
             }
             multimodal = created
         }
@@ -149,6 +215,23 @@ final class LlamaRuntime: @unchecked Sendable {
         self.multimodal = multimodal
         self.batchSize = Int32(llama_n_batch(context))
         self.contextSize = Int(llama_n_ctx(context))
+        self.chatTemplate = llama_model_chat_template(model, nil).map { String(cString: $0) }
+        self.usesGemma4Template = Self.metadata(model, "general.architecture") == "gemma4"
+    }
+
+    private static func metadata(_ model: OpaquePointer, _ key: String) -> String? {
+        var buffer = [CChar](repeating: 0, count: 256)
+        guard llama_model_meta_val_str(model, key, &buffer, buffer.count) >= 0 else { return nil }
+        return String(cString: buffer)
+    }
+
+    /// Gemma 4's chat template is written out in `GemmaPromptFormatter`; every other model
+    /// uses the template stored in its GGUF file.
+    private func formatPrompt(_ messages: [InferenceMessage]) -> (prompt: String, images: [Data]) {
+        if usesGemma4Template {
+            return GemmaPromptFormatter.format(messages, mediaMarker: mediaMarker)
+        }
+        return TemplatePromptFormatter.format(messages, template: chatTemplate, mediaMarker: mediaMarker)
     }
 
     deinit {
@@ -160,7 +243,7 @@ final class LlamaRuntime: @unchecked Sendable {
     /// Runs one completion. `emit` receives decoded text and returns false to stop early.
     func generate(request: InferenceRequest, emit: (String) -> Bool) throws {
         llama_memory_clear(llama_get_memory(context), true)
-        let (prompt, images) = GemmaPromptFormatter.format(request.messages, mediaMarker: mediaMarker)
+        let (prompt, images) = formatPrompt(request.messages)
 
         var nPast: Int32 = 0
         if let multimodal {
@@ -262,52 +345,6 @@ final class LlamaRuntime: @unchecked Sendable {
             llama_sampler_chain_add(sampler, llama_sampler_init_dist(UInt32.random(in: 0...UInt32.max)))
         }
         return sampler
-    }
-}
-
-/// Builds a Gemma 4 prompt, following the model's chat template for text and image turns.
-/// Images are replaced by the mtmd media marker, in message order.
-enum GemmaPromptFormatter {
-    static func format(_ messages: [InferenceMessage], mediaMarker: String) -> (prompt: String, images: [Data]) {
-        var prompt = ""
-        var images: [Data] = []
-        var remaining = messages[...]
-        if let first = remaining.first, first.role == .system {
-            prompt += "<|turn>system\n" + text(of: first).trimmingCharacters(in: .whitespacesAndNewlines) + "<turn|>\n"
-            remaining = remaining.dropFirst()
-        }
-        for message in remaining {
-            let role: String
-            switch message.role {
-            case .assistant: role = "model"
-            case .system: role = "system"
-            case .user, .tool: role = "user"
-            }
-            prompt += "<|turn>\(role)\n"
-            for part in message.parts {
-                switch part {
-                case let .text(value):
-                    prompt += value.trimmingCharacters(in: .whitespacesAndNewlines)
-                case let .image(image):
-                    prompt += "\n\n\(mediaMarker)\n\n"
-                    images.append(image.data)
-                case .audio:
-                    prompt += "[Audio input was omitted by this API adapter.]"
-                case let .tool(call):
-                    prompt += "[Tool \(call.name): \(call.argumentsJSON)]"
-                }
-            }
-            prompt += "<turn|>\n"
-        }
-        prompt += "<|turn>model\n"
-        return (prompt, images)
-    }
-
-    private static func text(of message: InferenceMessage) -> String {
-        message.parts.compactMap { part -> String? in
-            if case let .text(value) = part { return value }
-            return nil
-        }.joined(separator: "\n")
     }
 }
 

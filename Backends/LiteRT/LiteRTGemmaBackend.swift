@@ -57,18 +57,19 @@ actor LiteRTGemmaBackend: InferenceBackend {
 
     /// Engine configurations tried in order until one initializes and can open a conversation.
     ///
-    /// Image input is only enabled with the GPU vision encoder. The CPU (XNNPACK) vision encoder
-    /// can hang forever on iOS (LiteRT-LM issues #2979 and #2370), which wedges the whole server,
-    /// so it is used only when `LITERT_VISION_BACKEND=cpu` is set for experiments.
-    /// `LITERT_VISION_BACKEND=none` disables image input.
+    /// Image input is off by default: with LiteRT-LM 0.17.1 the GPU vision encoder always fails
+    /// on iOS (STABLEHLO_COMPOSITE), and every failed attempt leaves address space behind that a
+    /// later model load needs. The CPU (XNNPACK) vision encoder can hang forever (LiteRT-LM
+    /// issues #2979 and #2370), which wedges the whole server. Both stay available for
+    /// experiments through `LITERT_VISION_BACKEND=gpu` or `cpu`. Use a GGUF model for images.
     private static func attempts() -> [(backend: Backend, vision: Backend?)] {
         switch ProcessInfo.processInfo.environment["LITERT_VISION_BACKEND"] {
+        case "gpu":
+            return [(.gpu, .gpu), (.gpu, nil), (.cpu(), nil)]
         case "cpu":
             return [(.gpu, .cpu()), (.cpu(), .cpu())]
-        case "none":
-            return [(.gpu, nil), (.cpu(), nil)]
         default:
-            return [(.gpu, .gpu), (.gpu, nil), (.cpu(), nil)]
+            return [(.gpu, nil), (.cpu(), nil)]
         }
     }
 
@@ -123,8 +124,7 @@ actor LiteRTGemmaBackend: InferenceBackend {
     }
 
     func capabilities() async -> BackendCapabilities {
-        // Before a model is loaded, report what the default configuration aims for.
-        BackendCapabilities(text: true, image: loadedModel == nil || visionBackend != nil, audio: false, streaming: true)
+        BackendCapabilities(text: true, image: visionBackend != nil, audio: false, streaming: true)
     }
 
     func metrics() async -> BackendMetrics {

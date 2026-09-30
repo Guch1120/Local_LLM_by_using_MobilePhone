@@ -148,4 +148,29 @@ final class SecurityAndModelTests: XCTestCase {
             XCTAssertEqual(error.localizedDescription, "Only .litertlm or .gguf model files can be imported.")
         }
     }
+
+    func testTemplateFormatterAppliesChatMLAndKeepsImageOrder() {
+        let image = ImageInput(data: Data([1, 2, 3]), mimeType: "image/png")
+        let messages = [
+            InferenceMessage(role: .system, parts: [.text("Be brief.")]),
+            InferenceMessage(role: .user, parts: [.text("What is this?"), .image(image)])
+        ]
+        let result = TemplatePromptFormatter.format(messages, template: "chatml", mediaMarker: "<__media__>")
+        XCTAssertEqual(
+            result.prompt,
+            "<|im_start|>system\nBe brief.<|im_end|>\n"
+                + "<|im_start|>user\nWhat is this?\n<__media__><|im_end|>\n"
+                + "<|im_start|>assistant\n"
+        )
+        XCTAssertEqual(result.images, [image.data])
+    }
+
+    func testTemplateFormatterFallsBackToChatMLForUnknownTemplate() {
+        let messages = [InferenceMessage(role: .user, parts: [.text("Hello")])]
+        let expected = "<|im_start|>user\nHello<|im_end|>\n<|im_start|>assistant\n"
+        for template in ["{{ not a template llama.cpp knows }}", nil] {
+            let result = TemplatePromptFormatter.format(messages, template: template, mediaMarker: "<__media__>")
+            XCTAssertEqual(result.prompt, expected)
+        }
+    }
 }

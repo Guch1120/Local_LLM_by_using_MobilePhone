@@ -78,6 +78,14 @@ jobs:
           test -f "$APP/Frameworks/CLiteRTLM.framework/CLiteRTLM" || { echo "CLiteRTLM.framework is not embedded"; exit 1; }
           otool -l "$APP/iPhoneLocalAI" | grep -A2 LC_RPATH | grep -q '@executable_path/Frameworks' || { echo "Missing @executable_path/Frameworks rpath"; exit 1; }
 
+      # The archive is unsigned, so put the entitlements into an ad-hoc signature;
+      # the export below re-signs the app and keeps them.
+      - name: Embed entitlements
+        run: >-
+          bash scripts/ci/embed_entitlements.sh
+          "$RUNNER_TEMP/iPhoneLocalAI.xcarchive/Products/Applications/iPhoneLocalAI.app"
+          App/iPhoneLocalAI.entitlements
+
       - name: Export and upload with cloud-managed signing
         run: |
           set -euo pipefail

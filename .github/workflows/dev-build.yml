@@ -18,7 +18,7 @@ on:
       - 'PrivacyInfo.xcprivacy'
       - 'iPhoneLocalAI.xcodeproj/**'
       - '.github/workflows/dev-build.yml'
-      - 'scripts/ci/register_devices.py'
+      - 'scripts/ci/**'
   workflow_dispatch:
 
 permissions:
@@ -91,6 +91,14 @@ jobs:
           test -f "$APP/Frameworks/CLiteRTLM.framework/CLiteRTLM" || { echo "CLiteRTLM.framework is not embedded"; exit 1; }
           otool -l "$APP/iPhoneLocalAI" | grep -A2 LC_RPATH | grep -q '@executable_path/Frameworks' || { echo "Missing @executable_path/Frameworks rpath"; exit 1; }
 
+      # The archive is unsigned, so put the entitlements into an ad-hoc signature;
+      # the export below re-signs the app and keeps them.
+      - name: Embed entitlements
+        run: >-
+          bash scripts/ci/embed_entitlements.sh
+          "$RUNNER_TEMP/iPhoneLocalAI.xcarchive/Products/Applications/iPhoneLocalAI.app"
+          App/iPhoneLocalAI.entitlements
+
       - name: Export development IPA with cloud-managed signing
         run: |
           set -euo pipefail
@@ -117,6 +125,13 @@ jobs:
             -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
 
           ls -la "$RUNNER_TEMP/export"
+
+      - name: Verify entitlements of the exported app
+        run: |
+          set -euo pipefail
+          unzip -q "$RUNNER_TEMP/export/iPhoneLocalAI.ipa" -d "$RUNNER_TEMP/ipa"
+          bash scripts/ci/verify_entitlements.sh "$RUNNER_TEMP/ipa/Payload/iPhoneLocalAI.app" App/iPhoneLocalAI.entitlements
+          rm -rf "$RUNNER_TEMP/ipa"
 
       # Artifacts of a public repository can be downloaded by any GitHub user, and the
       # IPA embeds the provisioning profile (team and device UDIDs). Upload it encrypted.
