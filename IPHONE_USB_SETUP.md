@@ -288,7 +288,9 @@ bash scripts/iphone/launch.sh
 bash scripts/iphone/launch.sh gemma-4-e2b-it-q4_0
 ```
 
-Screenshots are black while the phone's display is off or locked. `pymobiledevice3 developer accessibility list-items` still prints the labels of the elements on screen, which is enough to check what a screen shows.
+`pymobiledevice3 developer accessibility list-items` prints the labels of the elements on screen, which is a quick way to check what a screen shows.
+
+Restart the app with this script rather than with `pymobiledevice3 developer dvt launch` directly: that command kills the running instance and starts a new one at once, and the new instance then shows a black screen although it keeps serving the API. The helper scripts stop the app, wait a few seconds, and launch with `--no-kill-existing`.
 
 With a model ID (as listed in the app's Models screen), the app loads that model at launch. The ID is passed as a launch argument that overrides the remembered model for this launch only, so neither the API key nor a tap on the phone is needed. Stop with Ctrl-C; the app keeps running.
 

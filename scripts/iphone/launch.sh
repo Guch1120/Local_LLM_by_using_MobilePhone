@@ -55,8 +55,13 @@ pymobiledevice3 mounter auto-mount >/dev/null 2>&1 || true
 echo "[INFO] Launching $bundle_id. Stop with Ctrl-C."
 echo "[INFO] Saving to: $output"
 
+# Letting the launch command kill a running instance and start a new one at once leaves the
+# new instance with a black screen. Stop the app, wait for it to go away, then launch.
+pymobiledevice3 developer dvt pkill --bundle "$bundle_id" >/dev/null 2>&1 || true
+sleep 3
+
 set +e
-pymobiledevice3 developer dvt launch --stream "$launch_arguments" 2>&1 | tee "$output"
+pymobiledevice3 developer dvt launch --no-kill-existing --stream "$launch_arguments" 2>&1 | tee "$output"
 status=${PIPESTATUS[0]}
 set -e
 

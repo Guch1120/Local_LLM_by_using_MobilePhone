@@ -75,7 +75,11 @@ done
 if [ "${NO_LAUNCH:-0}" != "1" ]; then
   echo "[INFO] Relaunching app to import the model..."
   pymobiledevice3 mounter auto-mount >/dev/null 2>&1 || true
-  if pymobiledevice3 developer dvt launch "$bundle_id" >/dev/null; then
+  # Letting the launch command kill a running instance and start a new one at once leaves the
+  # new instance with a black screen. Stop the app, wait for it to go away, then launch.
+  pymobiledevice3 developer dvt pkill --bundle "$bundle_id" >/dev/null 2>&1 || true
+  sleep 3
+  if pymobiledevice3 developer dvt launch --no-kill-existing "$bundle_id" >/dev/null; then
     echo "[OK] Relaunched $bundle_id. The import hashes the file and can take a minute."
   else
     echo "[WARN] Could not relaunch automatically; open the app on the iPhone." >&2

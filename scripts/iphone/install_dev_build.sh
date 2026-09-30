@@ -100,7 +100,8 @@ echo "[OK] Installed $bundle_id from run $run_id"
 if [ "${NO_LAUNCH:-0}" != "1" ]; then
   echo "[INFO] Launching app..."
   pymobiledevice3 mounter auto-mount >/dev/null 2>&1 || true
-  if pymobiledevice3 developer dvt launch "$bundle_id" >/dev/null; then
+  # The app was stopped before the install; do not let the launch kill anything (see launch.sh).
+  if pymobiledevice3 developer dvt launch --no-kill-existing "$bundle_id" >/dev/null; then
     echo "[OK] Launched $bundle_id"
   else
     echo "[WARN] Could not launch automatically; open the app on the iPhone." >&2
