@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     // The `-initialTab models` launch argument opens a tab directly (see scripts/iphone/launch.sh).
+    // A tab bar holds five tabs, so the logs are opened from the Diagnostics tab.
     @State private var selection = UserDefaults.standard.string(forKey: "initialTab") ?? "server"
 
     var body: some View {
@@ -9,6 +10,9 @@ struct MainTabView: View {
             ServerStatusView()
                 .tabItem { Label("サーバー", systemImage: "dot.radiowaves.left.and.right") }
                 .tag("server")
+            LiveOutputView()
+                .tabItem { Label("出力", systemImage: "text.bubble") }
+                .tag("output")
             ModelManagerView()
                 .tabItem { Label("モデル", systemImage: "shippingbox") }
                 .tag("models")
@@ -18,9 +22,6 @@ struct MainTabView: View {
             DiagnosticsView()
                 .tabItem { Label("診断", systemImage: "waveform.path.ecg") }
                 .tag("diagnostics")
-            LogsView()
-                .tabItem { Label("ログ", systemImage: "list.bullet.rectangle") }
-                .tag("logs")
         }
     }
 }

@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var revealKey = false
     @State private var copied = false
     @State private var huggingFaceToken = ""
+    @FocusState private var numberFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -19,6 +20,7 @@ struct SettingsView: View {
                     HStack {
                         TextField("ポート", text: $portText)
                             .keyboardType(.numberPad)
+                            .focused($numberFieldFocused)
                             .textFieldStyle(.roundedBorder)
                         Button("適用") {
                             if let value = Int(portText) { Task { await appState.applyPort(value) } }
@@ -37,8 +39,18 @@ struct SettingsView: View {
                 }
 
                 Section("推論の既定値") {
-                    Stepper(value: $maxTokens, in: 1...contextTokens) {
-                        LabeledContent("既定の出力トークン数", value: "\(maxTokens)")
+                    LabeledContent("既定の出力トークン数") {
+                        TextField("1〜\(String(contextTokens))", value: $maxTokens, format: .number.grouping(.never))
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .focused($numberFieldFocused)
+                            .frame(maxWidth: 110)
+                    }
+                    Stepper("128 ずつ増減", value: $maxTokens, in: 1...contextTokens, step: 128)
+                    if !(1...contextTokens).contains(maxTokens) {
+                        Text("1〜\(String(contextTokens)) の範囲で入力してください。")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
                     }
                     Picker("コンテキスト上限", selection: $contextTokens) {
                         ForEach([1024, 2048, 4096, 8192], id: \.self) { value in
@@ -60,7 +72,7 @@ struct SettingsView: View {
                             )
                         }
                     }
-                    .disabled(maxTokens > contextTokens)
+                    .disabled(!(1...contextTokens).contains(maxTokens))
                     Toggle("Multi-Token Prediction（実験的）", isOn: $multiTokenPredictionEnabled)
                     Text("これらは既定値です。OpenAI 形式のリクエストで出力トークン数と temperature を上書きできます。コンテキスト上限または MTP を変えると、ロード中の LiteRT モデルを再ロードします。")
                         .font(.footnote)
@@ -137,6 +149,13 @@ struct SettingsView: View {
                 Section { ErrorBanner().listRowInsets(EdgeInsets()) }
             }
             .navigationTitle("設定")
+            .toolbar {
+                // The number pad has no return key.
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { numberFieldFocused = false }
+                }
+            }
             .onAppear {
                 portText = String(appState.port)
                 maxTokens = appState.defaultMaxTokens

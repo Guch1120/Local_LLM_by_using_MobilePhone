@@ -10,7 +10,7 @@ Build a foreground iOS app that runs local text and image inference and exposes 
 - Do not reference LiteRT-LM from HTTP handlers, views, or model registry code.
 - Keep model files outside the app bundle. Import them into Application Support and record a SHA-256 digest.
 - Keep camera, audio, TTS, ROS, and cloud inference out of v0.1.
-- Keep prompt text and image contents out of logs and metrics. The live request view on the Server tab may show them on screen, from memory only.
+- Keep prompt text and image contents out of logs and metrics. The Output tab may show them on screen, from memory only.
 - Do not add telemetry, analytics, advertising, or remote crash reporting. The only outbound connections are to `huggingface.co`, to search and download models when the user asks for it.
 - Keep LAN exposure opt-in; do not silently expose the API to the local network.
 - Do not commit secrets, provisioning profiles, signing certificates, or model files.
@@ -36,7 +36,7 @@ Use these helpers for device checks from Ubuntu:
 - Screenshot: `bash scripts/iphone/screenshot.sh` (latest image: `artifacts/iphone/latest.png`)
 - iPhone logs: `bash scripts/iphone/syslog.sh`
 - HTTP API: run `bash scripts/iphone/proxy.sh` in a separate terminal (`127.0.0.1:8080 -> iPhone:8080`)
-- Screens: the app accepts launch arguments so a screen can be opened and checked with a screenshot without touching the phone, for example `APP_ARGS="-initialTab models -modelBrowserQuery gemma" bash scripts/iphone/launch.sh` (tabs: `server`, `models`, `settings`, `diagnostics`, `logs`; `-modelBrowserRepository owner/name` opens a repository's file list).
+- Screens: the app accepts launch arguments so a screen can be opened and checked with a screenshot without touching the phone, for example `APP_ARGS="-initialTab models -modelBrowserQuery gemma" bash scripts/iphone/launch.sh` (tabs: `server`, `output`, `models`, `settings`, `diagnostics`; the logs open from the Diagnostics tab; `-modelBrowserRepository owner/name` opens a repository's file list).
 - Screen contents: `pymobiledevice3 developer accessibility list-items` prints the labels of the elements on screen, which is quicker to check than a screenshot. A black screenshot with a working API means the app was relaunched the wrong way (see "Restarting the app").
 - Models on the phone: `GET /models` lists installed models and downloads; `POST /models/downloads` makes the phone download a file from Hugging Face.
 - Restarting the app: use the helper scripts. `pymobiledevice3 developer dvt launch` on its own kills the running instance and starts a new one at once, which leaves the new instance with a black screen although it keeps serving the API; the scripts stop the app, wait, then launch with `--no-kill-existing`.

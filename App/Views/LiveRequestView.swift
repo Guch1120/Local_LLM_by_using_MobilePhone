@@ -70,8 +70,6 @@ struct LiveRequest: Identifiable {
 /// Prompt, images and streaming reply of one request.
 struct LiveRequestView: View {
     let request: LiveRequest
-    /// The full view shows everything; the compact one keeps the reply in a fixed-height box.
-    let expanded: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -93,7 +91,7 @@ struct LiveRequestView: View {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(maxHeight: expanded ? 320 : 160)
+                                .frame(maxHeight: 320)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .accessibilityLabel("入力画像")
                         }
@@ -106,24 +104,13 @@ struct LiveRequestView: View {
                     .foregroundStyle(.secondary)
                 Text(request.prompt.isEmpty ? "（テキストなし）" : request.prompt)
                     .font(.callout)
-                    .lineLimit(expanded ? nil : 6)
                     .textSelection(.enabled)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("出力")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                if expanded {
-                    outputText
-                } else {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            outputText.id("output")
-                        }
-                        .frame(height: 200)
-                        .onChange(of: request.output) { _, _ in proxy.scrollTo("output", anchor: .bottom) }
-                    }
-                }
+                outputText
             }
         }
         .padding(.vertical, 4)
@@ -154,28 +141,32 @@ struct LiveRequestView: View {
     }
 }
 
-/// Full-screen version of the live view.
-struct LiveRequestScreen: View {
+/// The Output tab: the running request, following the reply as it is generated.
+struct LiveOutputView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let live = appState.liveRequest {
-                        LiveRequestView(request: live, expanded: true)
-                    } else {
-                        Text("リクエストの実行中、入力テキスト・画像・出力がここに表示されます。")
+        NavigationStack {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let live = appState.liveRequest {
+                            LiveRequestView(request: live)
+                        } else {
+                            Text("リクエストの実行中、入力テキスト・画像・出力がここに表示されます。")
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("この画面に表示するだけで、入力テキスト・画像・出力は保存もログ記録もしません。")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .id("end")
                     }
-                    Color.clear.frame(height: 1).id("end")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
                 }
-                .padding()
+                .onChange(of: appState.liveRequest?.output) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
             }
-            .onChange(of: appState.liveRequest?.output) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+            .navigationTitle("出力")
         }
-        .navigationTitle("実行中のリクエスト")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }

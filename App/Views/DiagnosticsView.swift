@@ -6,6 +6,13 @@ struct DiagnosticsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    NavigationLink {
+                        LogsView()
+                    } label: {
+                        Label("ログ", systemImage: "list.bullet.rectangle")
+                    }
+                }
                 Section("アプリのビルド") {
                     metric("バージョン / ビルド", value: appBuildText, symbol: "number.square")
                     metric("Git リビジョン", value: gitRevision, symbol: "chevron.left.forwardslash.chevron.right")
