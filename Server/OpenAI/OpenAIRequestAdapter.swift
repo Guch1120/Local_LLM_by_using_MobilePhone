@@ -61,6 +61,11 @@ enum OpenAIRequestAdapter {
                     case "image_url":
                         guard let url = part.imageURL?.url else { throw RequestValidationError.invalid("An image_url content part is missing its URL.") }
                         return .image(try decodeImageDataURL(url))
+                    case "input_audio":
+                        guard let audio = part.inputAudio else {
+                            throw RequestValidationError.invalid("An input_audio content part is missing its data.")
+                        }
+                        return try decodeAudio(audio)
                     default:
                         throw RequestValidationError.unsupportedModality("Unsupported content type '\(part.type)'.")
                     }
@@ -103,7 +108,40 @@ enum OpenAIRequestAdapter {
         return try normalizeImage(bytes)
     }
 
-    private static func normalizeImage(_ data: Data) throws -> ImageInput {
+    /// OpenAI's `input_audio` part: base64 WAV or MP3 (FLAC is accepted too), checked by its bytes.
+    static func decodeAudio(base64 encoded: String, format: String?) throws -> MessagePart {
+        guard encoded.utf8.count <= maximumImageBytes * 4 / 3 + 16,
+              let bytes = Data(base64Encoded: encoded), !bytes.isEmpty, bytes.count <= maximumImageBytes else {
+            throw RequestValidationError.invalid("The audio data is invalid or exceeds the 12 MiB limit.")
+        }
+        guard let mimeType = audioType(of: bytes) else {
+            throw RequestValidationError.unsupportedModality("Only WAV, MP3 and FLAC audio is supported.")
+        }
+        if let format, !mimeType.hasSuffix(format.lowercased()), !(format.lowercased() == "mp3" && mimeType == "audio/mpeg") {
+            throw RequestValidationError.invalid("The audio bytes do not match the declared format '\(format)'.")
+        }
+        return .audio(bytes, mimeType: mimeType)
+    }
+
+    private static func decodeAudio(_ audio: OpenAIInputAudio) throws -> MessagePart {
+        try decodeAudio(base64: audio.data, format: audio.format)
+    }
+
+    /// WAV ("RIFF....WAVE"), FLAC ("fLaC") or MP3 (ID3 tag or an MPEG frame sync).
+    static func audioType(of bytes: Data) -> String? {
+        let head = [UInt8](bytes.prefix(12))
+        if head.count >= 12, head[0..<4] == [0x52, 0x49, 0x46, 0x46], head[8..<12] == [0x57, 0x41, 0x56, 0x45] {
+            return "audio/wav"
+        }
+        if head.starts(with: [0x66, 0x4C, 0x61, 0x43]) { return "audio/flac" }
+        if head.starts(with: [0x49, 0x44, 0x33]) || (head.count >= 2 && head[0] == 0xFF && head[1] & 0xE0 == 0xE0) {
+            return "audio/mpeg"
+        }
+        return nil
+    }
+
+    /// Orientation-corrected JPEG with at most 2048 pixels on the long edge.
+    static func normalizeImage(_ data: Data) throws -> ImageInput {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw RequestValidationError.invalid("The image data could not be decoded.")
         }
@@ -175,11 +213,18 @@ private struct OpenAIContentPart: Decodable {
     let type: String
     let text: String?
     let imageURL: OpenAIImageURL?
+    let inputAudio: OpenAIInputAudio?
 
     enum CodingKeys: String, CodingKey {
         case type, text
         case imageURL = "image_url"
+        case inputAudio = "input_audio"
     }
+}
+
+private struct OpenAIInputAudio: Decodable {
+    let data: String
+    let format: String?
 }
 
 private struct OpenAIImageURL: Decodable {

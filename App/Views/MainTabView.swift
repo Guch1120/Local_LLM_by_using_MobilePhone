@@ -11,9 +11,9 @@ struct MainTabView: View {
             ServerStatusView()
                 .tabItem { Label("サーバー", systemImage: "dot.radiowaves.left.and.right") }
                 .tag("server")
-            LiveOutputView()
-                .tabItem { Label("出力", systemImage: "text.bubble") }
-                .tag("output")
+            ChatTabView()
+                .tabItem { Label("チャット", systemImage: "bubble.left.and.text.bubble.right") }
+                .tag("chat")
             ModelManagerView()
                 .tabItem { Label("モデル", systemImage: "shippingbox") }
                 .tag("models")

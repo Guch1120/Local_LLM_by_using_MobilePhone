@@ -30,6 +30,10 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>チャット画面で録音した音声を、この iPhone 上のモデルに入力するために使います。音声は端末の外に送信されません。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>チャット画面で撮影した写真を、この iPhone 上のモデルに入力するために使います。写真は端末の外に送信されません。</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Allow your PC to connect to the inference API when LAN access is enabled.</string>
 	<key>UIFileSharingEnabled</key>

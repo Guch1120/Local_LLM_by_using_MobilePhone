@@ -29,6 +29,7 @@ final class AppState: ObservableObject {
     @Published private(set) var multiTokenPredictionEnabled: Bool
     @Published private(set) var benchmarkRunning = false
     @Published private(set) var supportsVision = false
+    @Published private(set) var supportsAudio = false
     @Published private(set) var downloads: [ModelDownload] = []
     @Published private(set) var hasHuggingFaceToken = false
     /// The request that is running or ran last, for the live view. Kept in memory only.
@@ -214,6 +215,7 @@ final class AppState: ObservableObject {
         let active = await inference.activeModel()
         let capabilities = await inference.capabilities()
         supportsVision = active.loaded && capabilities.image
+        supportsAudio = active.loaded && capabilities.audio
         logEntries = await logs.list()
         if apiKey.isEmpty { apiKey = (try? keyStore.loadOrCreate()) ?? "" }
     }
@@ -449,6 +451,12 @@ extension AppState {
             stage = "load"
             try await inference.loadImportedModel(model, contextTokens: contextTokens, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
             UserDefaults.standard.set(id, forKey: Self.lastLoadedModelKey)
+            if model.projectorPath != nil {
+                // Only a loaded projector tells whether it takes images, audio or both.
+                let capabilities = await inference.capabilities()
+                let modalities = ["text"] + (capabilities.image ? ["image"] : []) + (capabilities.audio ? ["audio"] : [])
+                await modelManager.setModalities(id: id, modalities)
+            }
             lastError = nil
         } catch {
             let nsError = error as NSError
@@ -503,6 +511,17 @@ extension AppState {
         } catch {
             lastError = "モデルを削除できませんでした: \(error.localizedDescription)"
         }
+    }
+}
+
+// MARK: - On-device chat
+
+@MainActor
+extension AppState {
+    /// Runs a request from the chat screen through the same path as API requests, so the
+    /// thermal checks, metrics and the live view apply to it as well.
+    func generateOnDevice(_ request: InferenceRequest) async throws -> AsyncThrowingStream<InferenceChunk, Error> {
+        try await inference.generate(request)
     }
 }
 

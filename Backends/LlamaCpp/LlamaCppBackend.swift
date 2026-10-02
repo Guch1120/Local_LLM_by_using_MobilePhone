@@ -40,9 +40,12 @@ actor LlamaCppBackend: InferenceBackend {
 
     func generate(request: InferenceRequest) async throws -> AsyncThrowingStream<InferenceChunk, Error> {
         guard let runtime, loadedModel == request.model else { throw InferenceError.modelNotLoaded }
-        let hasImage = request.messages.flatMap(\.parts).contains { if case .image = $0 { return true }; return false }
-        if hasImage && !runtime.supportsVision {
+        let parts = request.messages.flatMap(\.parts)
+        if parts.contains(where: { if case .image = $0 { return true }; return false }) && !runtime.supportsVision {
             throw InferenceError.unsupportedModality("image")
+        }
+        if parts.contains(where: { if case .audio = $0 { return true }; return false }) && !runtime.supportsAudio {
+            throw InferenceError.unsupportedModality("audio")
         }
         return AsyncThrowingStream { continuation in
             let task = Task.detached(priority: .userInitiated) {
@@ -69,7 +72,9 @@ actor LlamaCppBackend: InferenceBackend {
     }
 
     func capabilities() async -> BackendCapabilities {
-        BackendCapabilities(text: true, image: runtime?.supportsVision ?? true, audio: false, streaming: true)
+        BackendCapabilities(
+            text: true, image: runtime?.supportsVision ?? true, audio: runtime?.supportsAudio ?? false, streaming: true
+        )
     }
 
     func metrics() async -> BackendMetrics {
@@ -88,7 +93,7 @@ enum LlamaError: Error, LocalizedError {
     case modelLoadFailed(String?)
     case contextInitFailed(String?)
     case projectorLoadFailed(String?)
-    case imageDecodeFailed
+    case mediaDecodeFailed
     case tokenizeFailed(Int32)
     case promptTooLong(Int, Int)
     case decodeFailed(Int32)
@@ -101,7 +106,7 @@ enum LlamaError: Error, LocalizedError {
             return Self.describe("llama.cpp could not create an inference context.", reason)
         case let .projectorLoadFailed(reason):
             return Self.describe("llama.cpp could not load the multimodal projector (mmproj).", reason)
-        case .imageDecodeFailed: return "The image could not be decoded for the vision encoder."
+        case .mediaDecodeFailed: return "The image or audio clip could not be decoded (images: JPEG/PNG; audio: WAV, MP3 or FLAC)."
         case let .tokenizeFailed(code): return "Prompt tokenization failed (\(code))."
         case let .promptTooLong(tokens, limit):
             return "The prompt needs \(tokens) tokens, but the context holds \(limit). Shorten it or raise the context length."
@@ -182,6 +187,8 @@ final class LlamaRuntime: @unchecked Sendable {
     private let usesGemma4Template: Bool
 
     var supportsVision: Bool { multimodal.map { mtmd_support_vision($0) } ?? false }
+    /// Audio needs a projector with an audio encoder (Gemma 4's mmproj has one).
+    var supportsAudio: Bool { multimodal.map { mtmd_support_audio($0) } ?? false }
 
     private static let backendInit: Void = {
         _ = LlamaLogCapture.install
@@ -238,7 +245,7 @@ final class LlamaRuntime: @unchecked Sendable {
 
     /// Gemma 4's chat template is written out in `GemmaPromptFormatter`; every other model
     /// uses the template stored in its GGUF file.
-    private func formatPrompt(_ messages: [InferenceMessage]) -> (prompt: String, images: [Data]) {
+    private func formatPrompt(_ messages: [InferenceMessage]) -> (prompt: String, media: [Data]) {
         if usesGemma4Template {
             return GemmaPromptFormatter.format(messages, mediaMarker: mediaMarker)
         }
@@ -261,11 +268,11 @@ final class LlamaRuntime: @unchecked Sendable {
     /// Runs one completion. `emit` receives decoded text and returns false to stop early.
     func generate(request: InferenceRequest, emit: (String) -> Bool) throws -> GenerationResult {
         llama_memory_clear(llama_get_memory(context), true)
-        let (prompt, images) = formatPrompt(request.messages)
+        let (prompt, media) = formatPrompt(request.messages)
 
         var nPast: Int32 = 0
         if let multimodal {
-            nPast = try evaluateMultimodal(prompt: prompt, images: images, multimodal: multimodal)
+            nPast = try evaluateMultimodal(prompt: prompt, media: media, multimodal: multimodal)
         } else {
             nPast = try evaluateText(prompt: prompt)
         }
@@ -317,11 +324,12 @@ final class LlamaRuntime: @unchecked Sendable {
         return count
     }
 
-    private func evaluateMultimodal(prompt: String, images: [Data], multimodal: OpaquePointer) throws -> Int32 {
+    /// `media` holds image and audio files in prompt order; mtmd tells them apart by their bytes.
+    private func evaluateMultimodal(prompt: String, media: [Data], multimodal: OpaquePointer) throws -> Int32 {
         var bitmaps: [OpaquePointer?] = []
         defer { bitmaps.forEach { if let bitmap = $0 { mtmd_bitmap_free(bitmap) } } }
-        for image in images {
-            let wrapper = image.withUnsafeBytes { raw in
+        for item in media {
+            let wrapper = item.withUnsafeBytes { raw in
                 mtmd_helper_bitmap_init_from_buf(
                     multimodal,
                     raw.bindMemory(to: UInt8.self).baseAddress,
@@ -330,7 +338,7 @@ final class LlamaRuntime: @unchecked Sendable {
                 )
             }
             if let video = wrapper.video_ctx { mtmd_helper_video_free(video) }
-            guard let bitmap = wrapper.bitmap else { throw LlamaError.imageDecodeFailed }
+            guard let bitmap = wrapper.bitmap else { throw LlamaError.mediaDecodeFailed }
             bitmaps.append(bitmap)
         }
 

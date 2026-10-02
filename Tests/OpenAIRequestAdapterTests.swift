@@ -61,6 +61,25 @@ final class OpenAIRequestAdapterTests: XCTestCase {
         XCTAssertTrue(image.data.starts(with: [0xFF, 0xD8, 0xFF]))
     }
 
+    func testDecodesInputAudioAndChecksItsBytes() throws {
+        let wav = Data([0x52, 0x49, 0x46, 0x46, 0x24, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]) + Data(count: 36)
+        let body = """
+        {"model":"m","messages":[{"role":"user","content":[{"type":"text","text":"What is said?"},\
+        {"type":"input_audio","input_audio":{"data":"\(wav.base64EncodedString())","format":"wav"}}]}]}
+        """
+        let request = try OpenAIRequestAdapter.adapt(Data(body.utf8)).inferenceRequest
+        guard case let .audio(data, mimeType) = request.messages[0].parts[1] else { return XCTFail("Expected an audio part") }
+        XCTAssertEqual(data, wav)
+        XCTAssertEqual(mimeType, "audio/wav")
+
+        XCTAssertEqual(OpenAIRequestAdapter.audioType(of: Data("fLaC....".utf8)), "audio/flac")
+        XCTAssertEqual(OpenAIRequestAdapter.audioType(of: Data([0x49, 0x44, 0x33, 4, 0])), "audio/mpeg")
+        XCTAssertNil(OpenAIRequestAdapter.audioType(of: Data("not audio".utf8)))
+        let notAudio = Data("hello".utf8).base64EncodedString()
+        XCTAssertThrowsError(try OpenAIRequestAdapter.decodeAudio(base64: notAudio, format: "wav"))
+        XCTAssertThrowsError(try OpenAIRequestAdapter.decodeAudio(base64: wav.base64EncodedString(), format: "mp3"))
+    }
+
     func testRejectsRemoteImageURL() throws {
         let json = #"{"model":"mock-echo","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.test/photo.png"}}]}]}"#
         XCTAssertThrowsError(try OpenAIRequestAdapter.adapt(Data(json.utf8)))

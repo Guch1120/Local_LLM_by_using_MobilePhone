@@ -19,7 +19,7 @@ Use an iPhone as a local text and vision inference server for an Ubuntu PC. The 
 
 ## Out of scope
 
-Camera capture, microphone/audio, speech recognition, TTS, embeddings, RAG, ROS, multiple simultaneously loaded models, unrestricted background serving, cloud telemetry, and public App Store release.
+Speech output (TTS), standalone speech recognition (audio is only an input of a multimodal model), embeddings, RAG, ROS, multiple simultaneously loaded models, unrestricted background serving, cloud telemetry, and public App Store release.
 
 ## Current stage
 
@@ -77,7 +77,9 @@ The turn counts scale with the context: twice the turns at 8192. They depend on 
 - `GET /models` lists the installed models (`id`, `name`, `backend`, `size_bytes`, `modalities`, `loaded`) and the Hugging Face downloads (`id`, `repository`, `file`, `state`, `received_bytes`, `total_bytes`, `error`, `model`). `POST /models/downloads` with `{"repository": "owner/name", "file": "model.gguf"}` (optional `revision`) queues a download and answers `202` with the download; an unknown repository or file, a file that is not a model, or too little free storage answers `400` with `download_failed`. States are `queued`, `downloading`, `importing`, `completed`, `failed`; downloads run one at a time, only while the app is in the foreground, and a failed download can be retried in the app.
 - The app contacts `huggingface.co` only to search and download models when the user (or an API client) asks for it. An optional access token for gated repositories is stored in Keychain and sent only to Hugging Face. Inference data never leaves the device.
 - Logs omit prompt and image contents.
-- The Output tab shows the request that is running or ran last: the last user message, its images, and the reply as it is generated, with the time to the first token and the generation speed. This live view exists only on the screen and in memory; it is replaced by the next request and is never written to logs, metrics or storage.
+- The Chat tab runs the model on the phone without a PC: pick an installed model, then type text and, when the loaded model accepts them, attach photos (library or camera) and audio (a microphone recording of up to 30 seconds, or the first 30 seconds of an audio file, converted to WAV). The attach buttons follow what the loaded model accepts; with Gemma 4 and its mmproj that is text, image and audio. Chat requests go through the same inference path as API requests (thermal pause, context limit, metrics) and send the whole conversation each turn. The conversation, photos and recordings stay in memory and are not stored or logged; "新しい会話" clears them.
+- Audio input: llama.cpp models whose projector has an audio encoder (`mtmd_support_audio`) take audio clips through the same media marker as images; libmtmd decodes WAV, MP3 and FLAC and resamples them. The API accepts OpenAI's `input_audio` content part (`{"type": "input_audio", "input_audio": {"data": "<base64>", "format": "wav"}}`, also `mp3` and FLAC), checked by its bytes and limited to 12 MiB; `/capabilities` reports `audio: true` for such a model, and requests with audio to other models get `unsupported_modality`. After a model with a projector is loaded, its registry entry records whether it took images and audio, which the Models tab shows.
+- In the Chat tab, "PC からのリクエスト" shows the request from the PC that is running or ran last: the last user message, its images, and the reply as it is generated, with the time to the first token and the generation speed. This live view exists only on the screen and in memory; it is replaced by the next request and is never written to logs, metrics or storage.
 - The current mock backend is named `mock-echo`; compatible `.litertlm` files are loaded through LiteRT-LM (text inference verified on device; image input see Current stage).
 
 ## Staged implementation

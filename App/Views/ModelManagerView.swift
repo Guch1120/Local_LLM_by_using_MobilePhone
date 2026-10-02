@@ -154,6 +154,9 @@ struct ModelManagerView: View {
                 if model.modalities.contains("image") {
                     capability("画像", symbol: "photo")
                 }
+                if model.modalities.contains("audio") {
+                    capability("音声", symbol: "waveform")
+                }
                 Text(model.backend)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

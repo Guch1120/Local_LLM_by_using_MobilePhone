@@ -152,36 +152,32 @@ struct LiveRequestStatusBar: View {
     }
 }
 
-/// The Output tab: the running request, following the reply as it is generated.
+/// Requests from the PC as they run, following the reply as it is generated (in the Chat tab).
 struct LiveOutputView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if let live = appState.liveRequest {
-                            LiveRequestView(request: live)
-                        } else {
-                            Text("リクエストの実行中、入力テキスト・画像・出力がここに表示されます。")
-                                .foregroundStyle(.secondary)
-                        }
-                        Text("この画面に表示するだけで、入力テキスト・画像・出力は保存もログ記録もしません。")
-                            .font(.footnote)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let live = appState.liveRequest {
+                        LiveRequestView(request: live)
+                    } else {
+                        Text("リクエストの実行中、入力テキスト・画像・出力がここに表示されます。")
                             .foregroundStyle(.secondary)
-                            .id("end")
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
+                    Text("この画面に表示するだけで、入力テキスト・画像・出力は保存もログ記録もしません。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .id("end")
                 }
-                .onChange(of: appState.liveRequest?.output) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if let live = appState.liveRequest { LiveRequestStatusBar(request: live) }
-            }
-            .navigationTitle("出力")
-            .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: appState.liveRequest?.output) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let live = appState.liveRequest { LiveRequestStatusBar(request: live) }
         }
     }
 }

@@ -17,8 +17,9 @@ struct InstalledModel: Codable, Identifiable, Sendable {
     var projectorURL: URL? { projectorPath.map { URL(fileURLWithPath: $0) } }
 
     /// The app container path changes across reinstalls, so resolve the file by name.
-    /// Image input needs a projector; registries written by older builds listed it for every
-    /// LiteRT-LM model, so the modalities are derived again here.
+    /// Image and audio input need a projector. Without one a model is text only (registries written
+    /// by older builds listed image input for every LiteRT-LM model); with one, the modalities are
+    /// what the last load reported, or text and image before the first load.
     func relocated(to directory: URL) -> InstalledModel {
         InstalledModel(
             id: id,
@@ -27,7 +28,7 @@ struct InstalledModel: Codable, Identifiable, Sendable {
             path: directory.appendingPathComponent(fileURL.lastPathComponent).path,
             sha256: sha256,
             sizeBytes: sizeBytes,
-            modalities: projectorPath == nil ? ["text"] : ["text", "image"],
+            modalities: projectorPath == nil ? ["text"] : (modalities.count > 1 ? modalities : ["text", "image"]),
             importedAt: importedAt,
             projectorPath: projectorURL.map { directory.appendingPathComponent($0.lastPathComponent).path }
         )
@@ -227,6 +228,19 @@ actor ModelManager {
         )
         try persist()
         return installedModels[index]
+    }
+
+    /// Records what the model accepts once it has been loaded (a projector can add image and/or audio).
+    func setModalities(id: String, _ modalities: [String]) {
+        guard let index = installedModels.firstIndex(where: { $0.id == id }),
+              installedModels[index].modalities != modalities else { return }
+        let model = installedModels[index]
+        installedModels[index] = InstalledModel(
+            id: model.id, name: model.name, backend: model.backend, path: model.path, sha256: model.sha256,
+            sizeBytes: model.sizeBytes, modalities: modalities, importedAt: model.importedAt,
+            projectorPath: model.projectorPath
+        )
+        try? persist()
     }
 
     func removeModel(id: String) throws {

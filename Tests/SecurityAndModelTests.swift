@@ -221,7 +221,13 @@ final class SecurityAndModelTests: XCTestCase {
                 + "<|im_start|>user\nWhat is this?\n<__media__><|im_end|>\n"
                 + "<|im_start|>assistant\n"
         )
-        XCTAssertEqual(result.images, [image.data])
+        XCTAssertEqual(result.media, [image.data])
+
+        let clip = Data("RIFF....WAVEfmt ".utf8)
+        let spoken = [InferenceMessage(role: .user, parts: [.text("What is said?"), .audio(clip, mimeType: "audio/wav")])]
+        let gemma = GemmaPromptFormatter.format(spoken, mediaMarker: "<__media__>")
+        XCTAssertEqual(gemma.prompt, "<|turn>user\nWhat is said?\n\n<__media__>\n\n<turn|>\n<|turn>model\n")
+        XCTAssertEqual(gemma.media, [clip])
     }
 
     func testTemplateFormatterFallsBackToChatMLForUnknownTemplate() {

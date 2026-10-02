@@ -1,12 +1,12 @@
 import Foundation
 import llama
 
-/// Builds a Gemma 4 prompt, following the model's chat template for text and image turns.
-/// Images are replaced by the mtmd media marker, in message order.
+/// Builds a Gemma 4 prompt, following the model's chat template for text, image and audio turns.
+/// Images and audio clips are replaced by the mtmd media marker, in message order.
 enum GemmaPromptFormatter {
-    static func format(_ messages: [InferenceMessage], mediaMarker: String) -> (prompt: String, images: [Data]) {
+    static func format(_ messages: [InferenceMessage], mediaMarker: String) -> (prompt: String, media: [Data]) {
         var prompt = ""
-        var images: [Data] = []
+        var media: [Data] = []
         var remaining = messages[...]
         if let first = remaining.first, first.role == .system {
             prompt += "<|turn>system\n" + text(of: first).trimmingCharacters(in: .whitespacesAndNewlines) + "<turn|>\n"
@@ -26,9 +26,10 @@ enum GemmaPromptFormatter {
                     prompt += value.trimmingCharacters(in: .whitespacesAndNewlines)
                 case let .image(image):
                     prompt += "\n\n\(mediaMarker)\n\n"
-                    images.append(image.data)
-                case .audio:
-                    prompt += "[Audio input was omitted by this API adapter.]"
+                    media.append(image.data)
+                case let .audio(data, _):
+                    prompt += "\n\n\(mediaMarker)\n\n"
+                    media.append(data)
                 case let .tool(call):
                     prompt += "[Tool \(call.name): \(call.argumentsJSON)]"
                 }
@@ -36,7 +37,7 @@ enum GemmaPromptFormatter {
             prompt += "<turn|>\n"
         }
         prompt += "<|turn>model\n"
-        return (prompt, images)
+        return (prompt, media)
     }
 
     private static func text(of message: InferenceMessage) -> String {
@@ -55,8 +56,8 @@ enum TemplatePromptFormatter {
 
     static func format(
         _ messages: [InferenceMessage], template: String?, mediaMarker: String
-    ) -> (prompt: String, images: [Data]) {
-        var images: [Data] = []
+    ) -> (prompt: String, media: [Data]) {
+        var media: [Data] = []
         let turns: [Turn] = messages.map { message in
             var content = ""
             for part in message.parts {
@@ -65,9 +66,10 @@ enum TemplatePromptFormatter {
                     content += value
                 case let .image(image):
                     content += "\n\(mediaMarker)\n"
-                    images.append(image.data)
-                case .audio:
-                    content += "[Audio input was omitted by this API adapter.]"
+                    media.append(image.data)
+                case let .audio(data, _):
+                    content += "\n\(mediaMarker)\n"
+                    media.append(data)
                 case let .tool(call):
                     content += "[Tool \(call.name): \(call.argumentsJSON)]"
                 }
@@ -77,7 +79,7 @@ enum TemplatePromptFormatter {
         let prompt = template.flatMap { apply($0, to: turns) }
             ?? apply("chatml", to: turns)
             ?? turns.map(\.content).joined(separator: "\n")
-        return (prompt, images)
+        return (prompt, media)
     }
 
     private static func roleName(_ role: MessageRole) -> String {
