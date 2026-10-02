@@ -167,13 +167,22 @@ struct ChatView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            modelBar
-            Divider()
-            transcript
-            Divider()
-            inputBar
-        }
+        transcript
+            .safeAreaInset(edge: .top, spacing: 0) {
+                VStack(spacing: 0) {
+                    modelBar
+                    Divider()
+                }
+                .background(.bar)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+                    inputBar
+                }
+                .background(.bar)
+            }
+            .keyboardDismissible()
         .sheet(isPresented: $showingCamera) {
             CameraPicker { image in addImage(image.jpegData(compressionQuality: 0.9)) }
                 .ignoresSafeArea()
@@ -273,7 +282,7 @@ struct ChatView: View {
     private var transcript: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 14) {
                     if session.turns.isEmpty {
                         Text("この iPhone 上のモデルと会話します。入力と出力は端末の外に送られず、保存もされません。")
                             .font(.footnote)
@@ -287,9 +296,11 @@ struct ChatView: View {
                 }
                 .padding()
             }
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: session.turns.last?.text) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+            .defaultScrollAnchor(.bottom)
+            // Follow the reply about once per line rather than on every token.
+            .onChange(of: (session.turns.last?.text.count ?? 0) / 40) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
             .onChange(of: session.turns.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+            .onTapGesture { draftFocused = false }
         }
     }
 
@@ -322,7 +333,7 @@ struct ChatView: View {
                         .buttonStyle(.borderedProminent)
                 }
             }
-            HStack(alignment: .bottom, spacing: 12) {
+            HStack(alignment: .bottom, spacing: 4) {
                 if appState.supportsVision {
                     Menu {
                         PhotosPicker(selection: $photoItem, matching: .images) {
@@ -332,7 +343,7 @@ struct ChatView: View {
                             Button { showingCamera = true } label: { Label("写真を撮る", systemImage: "camera") }
                         }
                     } label: {
-                        Image(systemName: "photo").font(.title3)
+                        Image(systemName: "photo").font(.title3).frame(width: 44, height: 44).contentShape(Rectangle())
                     }
                     .accessibilityLabel("画像を添付")
                 }
@@ -341,7 +352,7 @@ struct ChatView: View {
                         Button { startRecording() } label: { Label("録音する", systemImage: "mic") }
                         Button { showingAudioImporter = true } label: { Label("音声ファイルを選ぶ", systemImage: "folder") }
                     } label: {
-                        Image(systemName: "mic").font(.title3)
+                        Image(systemName: "mic").font(.title3).frame(width: 44, height: 44).contentShape(Rectangle())
                     }
                     .disabled(recorder.isRecording)
                     .accessibilityLabel("音声を添付")
@@ -352,12 +363,12 @@ struct ChatView: View {
                     .focused($draftFocused)
                 if session.isGenerating {
                     Button { session.stop() } label: {
-                        Image(systemName: "stop.circle.fill").font(.title2)
+                        Image(systemName: "stop.circle.fill").font(.title2).frame(width: 44, height: 44).contentShape(Rectangle())
                     }
                     .accessibilityLabel("生成を停止")
                 } else {
                     Button { send() } label: {
-                        Image(systemName: "arrow.up.circle.fill").font(.title2)
+                        Image(systemName: "arrow.up.circle.fill").font(.title2).frame(width: 44, height: 44).contentShape(Rectangle())
                     }
                     .disabled(!canSend)
                     .accessibilityLabel("送信")
@@ -490,12 +501,16 @@ private struct ChatBubble: View {
                 }
                 if !turn.text.isEmpty || turn.state == .generating {
                     Text(rendered)
-                        .textSelection(.enabled)
                         .padding(10)
                         .background(
                             turn.role == .user ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.12),
                             in: RoundedRectangle(cornerRadius: 12)
                         )
+                        .contextMenu {
+                            Button { UIPasteboard.general.string = turn.text } label: {
+                                Label("コピー", systemImage: "doc.on.doc")
+                            }
+                        }
                 }
                 if let status {
                     Text(status.text)
