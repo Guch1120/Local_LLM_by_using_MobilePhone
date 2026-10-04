@@ -188,9 +188,10 @@ final class LlamaRuntime: @unchecked Sendable {
     private let batchSize: Int32
     let contextSize: Int
     /// What the KV cache holds, so a request that continues the previous conversation only evaluates
-    /// what is new. `LLAMA_PROMPT_CACHE=0` turns it off (to measure what it saves).
+    /// what is new. `LLAMA_PROMPT_CACHE=0` or the launch argument `-llamaPromptCache 0` turns it off (to measure what it saves).
     private var promptCache = PromptCache()
     private let promptCacheEnabled = ProcessInfo.processInfo.environment["LLAMA_PROMPT_CACHE"] != "0"
+        && UserDefaults.standard.string(forKey: "llamaPromptCache") != "0"
     private let chatTemplate: String?
     private let usesGemma4Template: Bool
 
