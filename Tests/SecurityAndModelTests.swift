@@ -339,6 +339,27 @@ final class SecurityAndModelTests: XCTestCase {
         XCTAssertEqual(reuse.resumeTokenOffset, 2)
     }
 
+    func testPromptCacheEvaluatesTheLastTokenWhenThePromptEndsInsideTheCachedReply() {
+        // The same prompt sent again: the cache holds the prompt and the previous reply, so the prompt is a
+        // strict prefix of the cached text. Without a token to evaluate there is no logit, and the model
+        // answered with nothing (found on the phone).
+        var cache = PromptCache()
+        cache.store(prompt: [.text([1, 2, 3, 4, 5])], generated: [6, 7, 8])
+        let same = cache.reuse(for: [.text([1, 2, 3, 4, 5])])
+        XCTAssertEqual(same.keptPositions, 4)
+        XCTAssertEqual(same.resumeTokenOffset, 4)
+
+        // A turn that goes on from the reply keeps the whole cache.
+        let next = cache.reuse(for: [.text([1, 2, 3, 4, 5, 6, 7, 8, 9])])
+        XCTAssertEqual(next.keptPositions, 8)
+        XCTAssertEqual(next.resumeTokenOffset, 8)
+
+        // Diverging inside the reply keeps only the common start.
+        let diverge = cache.reuse(for: [.text([1, 2, 3, 4, 5, 6, 99])])
+        XCTAssertEqual(diverge.keptPositions, 6)
+        XCTAssertEqual(diverge.resumeTokenOffset, 6)
+    }
+
     func testPromptCacheResetForgetsEverything() {
         var cache = PromptCache()
         cache.store(prompt: [.text([1, 2, 3])], generated: [4])

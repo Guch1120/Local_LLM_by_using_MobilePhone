@@ -55,11 +55,17 @@ struct PromptCache: Sendable {
             }
             switch (cached[index], segment) {
             case let (.text(old), .text(new)):
-                let common = zip(old, new).prefix { $0 == $1 }.count
-                kept += common
+                var common = zip(old, new).prefix { $0 == $1 }.count
                 if common == new.count, common == old.count {
+                    kept += common
                     continue
                 }
+                if common == new.count, index == incoming.count - 1, common > 0 {
+                    // The new prompt ends inside the cached text (the cache also holds the previous reply).
+                    // The model needs a fresh logit for the last prompt token, so that token is evaluated again.
+                    common -= 1
+                }
+                kept += common
                 return Reuse(keptPositions: kept, resumeSegment: index, resumeTokenOffset: common)
             case let (.media(oldID, _, oldPositions), .media(newID, _, _)):
                 if oldID == newID, !oldID.isEmpty {

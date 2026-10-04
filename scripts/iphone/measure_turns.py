@@ -193,6 +193,8 @@ def main() -> int:
         history.append({"role": "assistant", "content": choice["message"]["content"]})
         cached = (usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
         recall = ""
+        if usage["completion_tokens"] == 0 and choice["finish_reason"] == "stop":
+            recall = "  EMPTY REPLY"
         if expected:
             ok = all(word in choice["message"]["content"] for word in expected)
             recall_total += 1
