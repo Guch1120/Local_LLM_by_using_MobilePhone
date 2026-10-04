@@ -14,6 +14,7 @@
 		200000000000000000000008 /* LogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000008 /* LogsView.swift */; };
 		20000000000000000000000A /* InferenceBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000A /* InferenceBackend.swift */; };
 		20000000000000000000000B /* InferenceRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000B /* InferenceRequest.swift */; };
+		200000000000000000000100 /* PromptCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000100 /* PromptCache.swift */; };
 		20000000000000000000000C /* InferenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000C /* InferenceService.swift */; };
 		20000000000000000000000D /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000D /* ModelManager.swift */; };
 		20000000000000000000000E /* MetricsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000000E /* MetricsService.swift */; };
@@ -53,6 +54,7 @@
 		10000000000000000000001C /* iPhoneLocalAI.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iPhoneLocalAI.entitlements; sourceTree = "<group>"; };
 		10000000000000000000000A /* InferenceBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceBackend.swift; sourceTree = "<group>"; };
 		10000000000000000000000B /* InferenceRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceRequest.swift; sourceTree = "<group>"; };
+		100000000000000000000100 /* PromptCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptCache.swift; sourceTree = "<group>"; };
 		10000000000000000000000C /* InferenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceService.swift; sourceTree = "<group>"; };
 		10000000000000000000000D /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
 		10000000000000000000000E /* MetricsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsService.swift; sourceTree = "<group>"; };
@@ -82,7 +84,7 @@
 		900000000000000000000002 /* iPhoneLocalAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iPhoneLocalAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		300000000000000000000004 /* Views */ = {isa = PBXGroup; children = (100000000000000000000003, 100000000000000000000004, 100000000000000000000005, 100000000000000000000006, 100000000000000000000007, 100000000000000000000008, 100000000000000000000020, 100000000000000000000023, 100000000000000000000024, 100000000000000000000025); path = Views; sourceTree = "<group>"; };
 		300000000000000000000003 /* App */ = {isa = PBXGroup; children = (100000000000000000000001, 100000000000000000000002, 100000000000000000000009, 10000000000000000000001C, 300000000000000000000004); name = App; path = App; sourceTree = "<group>"; };
-		300000000000000000000006 /* Inference */ = {isa = PBXGroup; children = (10000000000000000000000A, 10000000000000000000000B, 10000000000000000000000C); path = Inference; sourceTree = "<group>"; };
+		300000000000000000000006 /* Inference */ = {isa = PBXGroup; children = (10000000000000000000000A, 10000000000000000000000B, 10000000000000000000000C, 100000000000000000000100); path = Inference; sourceTree = "<group>"; };
 		300000000000000000000007 /* Models */ = {isa = PBXGroup; children = (10000000000000000000000D, 10000000000000000000001E, 10000000000000000000001F); path = Models; sourceTree = "<group>"; };
 		300000000000000000000008 /* Metrics */ = {isa = PBXGroup; children = (10000000000000000000000E); path = Metrics; sourceTree = "<group>"; };
 		300000000000000000000009 /* Logging */ = {isa = PBXGroup; children = (10000000000000000000000F, 100000000000000000000022); path = Logging; sourceTree = "<group>"; };
@@ -98,6 +100,7 @@
 		300000000000000000000002 /* Products */ = {isa = PBXGroup; children = (900000000000000000000001, 900000000000000000000002); name = Products; sourceTree = "<group>"; };
 		300000000000000000000001 /* root */ = {isa = PBXGroup; children = (300000000000000000000003, 300000000000000000000005, 30000000000000000000000B, 30000000000000000000000E, 300000000000000000000010, 100000000000000000000019, 10000000000000000000001A, 300000000000000000000002); sourceTree = "<group>"; };
 		400000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				200000000000000000000100,
 				200000000000000000000001,
 				200000000000000000000002,
 				200000000000000000000003,

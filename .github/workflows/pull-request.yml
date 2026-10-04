@@ -24,6 +24,8 @@ jobs:
     container: ghcr.io/realm/swiftlint:0.65.1
     steps:
       - uses: actions/checkout@v7.0.1
+      - name: Check that every Swift file is in the Xcode project
+        run: bash scripts/ci/check_project_files.sh
       - name: Lint Swift sources
         run: swiftlint lint --quiet
 
