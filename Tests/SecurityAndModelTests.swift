@@ -257,4 +257,93 @@ final class SecurityAndModelTests: XCTestCase {
             "The prompt needs 10783 tokens, but the context holds 8192. Shorten it or raise the context length."
         )
     }
+
+    // MARK: - Prompt cache (KV cache reuse)
+
+    func testPromptCacheKeepsTheStartOfAContinuedConversation() {
+        var cache = PromptCache()
+        let turn1: [PromptSegment] = [.text([1, 2, 3, 4, 5])]
+        cache.store(prompt: turn1, generated: [6, 7])
+
+        // The next turn repeats the first prompt and the reply, then adds the new question.
+        let turn2: [PromptSegment] = [.text([1, 2, 3, 4, 5, 6, 7, 8, 9])]
+        let reuse = cache.reuse(for: turn2)
+        XCTAssertEqual(reuse.keptPositions, 7)
+        XCTAssertEqual(reuse.resumeSegment, 0)
+        XCTAssertEqual(reuse.resumeTokenOffset, 7)
+    }
+
+    func testPromptCacheStopsAtTheFirstDifference() {
+        var cache = PromptCache()
+        cache.store(prompt: [.text([1, 2, 3, 4, 5])], generated: [])
+        // The reply came back with different tokens: only the matching start stays.
+        let reuse = cache.reuse(for: [.text([1, 2, 3, 9, 9, 9])])
+        XCTAssertEqual(reuse.keptPositions, 3)
+        XCTAssertEqual(reuse.resumeTokenOffset, 3)
+
+        // A change in the very first token keeps nothing.
+        XCTAssertEqual(cache.reuse(for: [.text([9, 2, 3])]).keptPositions, 0)
+    }
+
+    func testPromptCacheRecognisesTheSameImageByItsHash() {
+        var cache = PromptCache()
+        let image = PromptSegment.media(id: "abc", tokens: 134, positions: 134)
+        cache.store(prompt: [.text([1, 2]), image, .text([3, 4])], generated: [5])
+
+        // Same picture, longer text after it: the image is not encoded again.
+        let same = cache.reuse(for: [.text([1, 2]), image, .text([3, 4, 5, 6])])
+        XCTAssertEqual(same.keptPositions, 2 + 134 + 3)
+        XCTAssertEqual(same.resumeSegment, 2)
+        XCTAssertEqual(same.resumeTokenOffset, 3)
+
+        // A different picture in the same place: everything after the text before it is recomputed.
+        let other = PromptSegment.media(id: "xyz", tokens: 134, positions: 134)
+        let changed = cache.reuse(for: [.text([1, 2]), other, .text([3, 4])])
+        XCTAssertEqual(changed.keptPositions, 2)
+        XCTAssertEqual(changed.resumeSegment, 1)
+
+        // A picture without a hash is never trusted.
+        let unnamed = PromptSegment.media(id: "", tokens: 134, positions: 134)
+        var emptyIDCache = PromptCache()
+        emptyIDCache.store(prompt: [.text([1]), unnamed], generated: [])
+        XCTAssertEqual(emptyIDCache.reuse(for: [.text([1]), unnamed]).keptPositions, 1)
+    }
+
+    func testPromptCacheRecomputesTheLastTokenWhenNothingIsNew() {
+        var cache = PromptCache()
+        cache.store(prompt: [.text([1, 2, 3])], generated: [])
+        // The identical prompt again: the model still needs a logit for the last token.
+        let reuse = cache.reuse(for: [.text([1, 2, 3])])
+        XCTAssertEqual(reuse.keptPositions, 2)
+        XCTAssertEqual(reuse.resumeTokenOffset, 2)
+    }
+
+    func testPromptCacheEvaluatesAWholeTrailingImageAgain() {
+        var cache = PromptCache()
+        let image = PromptSegment.media(id: "abc", tokens: 134, positions: 134)
+        cache.store(prompt: [.text([1, 2]), image], generated: [])
+        let reuse = cache.reuse(for: [.text([1, 2]), image])
+        XCTAssertEqual(reuse.keptPositions, 2)
+        XCTAssertEqual(reuse.resumeSegment, 1)
+        XCTAssertEqual(reuse.resumeTokenOffset, 0)
+        XCTAssertEqual(PromptCache().reuse(for: []).keptPositions, 0)
+    }
+
+    func testPromptCacheStartsANewTextRunForTheReplyAfterAnImage() {
+        var cache = PromptCache()
+        let image = PromptSegment.media(id: "abc", tokens: 134, positions: 134)
+        cache.store(prompt: [.text([1, 2]), image], generated: [7, 8])
+        let reuse = cache.reuse(for: [.text([1, 2]), image, .text([7, 8, 9])])
+        XCTAssertEqual(reuse.keptPositions, 2 + 134 + 2)
+        XCTAssertEqual(reuse.resumeSegment, 2)
+        XCTAssertEqual(reuse.resumeTokenOffset, 2)
+    }
+
+    func testPromptCacheResetForgetsEverything() {
+        var cache = PromptCache()
+        cache.store(prompt: [.text([1, 2, 3])], generated: [4])
+        XCTAssertEqual(cache.cachedPositions, 4)
+        cache.reset()
+        XCTAssertEqual(cache.reuse(for: [.text([1, 2, 3, 4])]).keptPositions, 0)
+    }
 }

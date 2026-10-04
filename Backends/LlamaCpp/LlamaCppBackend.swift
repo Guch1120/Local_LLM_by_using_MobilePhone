@@ -57,7 +57,11 @@ actor LlamaCppBackend: InferenceBackend {
                     continuation.yield(InferenceChunk(
                         text: "",
                         finishReason: result.reachedLimit ? "length" : "stop",
-                        usage: TokenUsage(promptTokens: result.promptTokens, completionTokens: result.completionTokens)
+                        usage: TokenUsage(
+                            promptTokens: result.promptTokens,
+                            completionTokens: result.completionTokens,
+                            cachedTokens: result.reusedPositions
+                        )
                     ))
                     continuation.finish()
                 } catch let LlamaError.promptTooLong(tokens, limit) {
@@ -183,6 +187,10 @@ final class LlamaRuntime: @unchecked Sendable {
     private let multimodal: OpaquePointer?
     private let batchSize: Int32
     let contextSize: Int
+    /// What the KV cache holds, so a request that continues the previous conversation only evaluates
+    /// what is new. `LLAMA_PROMPT_CACHE=0` turns it off (to measure what it saves).
+    private var promptCache = PromptCache()
+    private let promptCacheEnabled = ProcessInfo.processInfo.environment["LLAMA_PROMPT_CACHE"] != "0"
     private let chatTemplate: String?
     private let usesGemma4Template: Bool
 
@@ -263,69 +271,170 @@ final class LlamaRuntime: @unchecked Sendable {
         let reachedLimit: Bool
         let promptTokens: Int
         let completionTokens: Int
+        /// Prompt positions that were already in the KV cache and did not have to be evaluated.
+        let reusedPositions: Int
     }
 
     /// Runs one completion. `emit` receives decoded text and returns false to stop early.
     func generate(request: InferenceRequest, emit: (String) -> Bool) throws -> GenerationResult {
-        llama_memory_clear(llama_get_memory(context), true)
         let (prompt, media) = formatPrompt(request.messages)
-
-        var nPast: Int32 = 0
-        if let multimodal {
-            nPast = try evaluateMultimodal(prompt: prompt, media: media, multimodal: multimodal)
-        } else {
-            nPast = try evaluateText(prompt: prompt)
-        }
+        let evaluation = try evaluate(prompt: prompt, media: media)
+        let nPast = evaluation.nextPosition
 
         let sampler = Self.makeSampler(temperature: request.temperature)
         defer { llama_sampler_free(sampler) }
         var decoder = UTF8StreamDecoder()
         let budget = min(request.maxTokens, contextSize - Int(nPast))
         var reachedLimit = true
-        var generated = 0
-        let promptTokens = Int(nPast)
+        var generatedTokens: [Int32] = []
+        let promptTokens = evaluation.promptTokens
+        func finish(limit: Bool) -> GenerationResult {
+            // The generated tokens are in the KV cache now, so the next turn can keep them.
+            promptCache.store(prompt: evaluation.segments, generated: generatedTokens)
+            return GenerationResult(
+                reachedLimit: limit,
+                promptTokens: promptTokens,
+                completionTokens: generatedTokens.count,
+                reusedPositions: evaluation.reusedPositions
+            )
+        }
         for _ in 0..<max(0, budget) {
             let token = llama_sampler_sample(sampler, context, -1)
             if llama_vocab_is_eog(vocab, token) {
                 reachedLimit = false
                 break
             }
-            generated += 1
+            generatedTokens.append(token)
             if let text = decoder.append(piece(for: token)), !text.isEmpty, !emit(text) {
-                return GenerationResult(reachedLimit: false, promptTokens: promptTokens, completionTokens: generated)
+                // Stopped early: the last token was sampled but not decoded, so it is not in the cache.
+                generatedTokens.removeLast()
+                return finish(limit: false)
             }
             var next = token
             let status = llama_decode(context, llama_batch_get_one(&next, 1))
-            if status != 0 { throw LlamaError.decodeFailed(status) }
+            if status != 0 {
+                promptCache.reset()
+                throw LlamaError.decodeFailed(status)
+            }
         }
         if let rest = decoder.flush(), !rest.isEmpty { _ = emit(rest) }
-        return GenerationResult(reachedLimit: reachedLimit, promptTokens: promptTokens, completionTokens: generated)
+        return finish(limit: reachedLimit)
+    }
+
+    struct Evaluation {
+        /// The prompt as segments, in the form the cache compares.
+        let segments: [PromptSegment]
+        let nextPosition: Int32
+        let promptTokens: Int
+        let reusedPositions: Int
+    }
+
+    /// Evaluates the prompt, skipping the start that the KV cache already holds.
+    private func evaluate(prompt: String, media: [Data]) throws -> Evaluation {
+        let memory = llama_get_memory(context)
+        let chunks = try tokenize(prompt: prompt, media: media)
+        defer { if let chunks = chunks.handle { mtmd_input_chunks_free(chunks) } }
+        let segments = chunks.segments
+        let needed = segments.reduce(0) { $0 + $1.tokenCount }
+        guard needed < contextSize else { throw LlamaError.promptTooLong(needed, contextSize) }
+
+        let reuse = promptCacheEnabled ? promptCache.reuse(for: segments) : PromptCache.Reuse(keptPositions: 0, resumeSegment: 0, resumeTokenOffset: 0)
+        if reuse.keptPositions == 0 {
+            llama_memory_clear(memory, true)
+        } else if !llama_memory_seq_rm(memory, 0, llama_pos(reuse.keptPositions), -1) {
+            // The cache could not drop the tail (a sliding-window cache can refuse); start over.
+            llama_memory_clear(memory, true)
+            return try evaluateFromStart(chunks: chunks, segments: segments)
+        }
+
+        var position = llama_pos(reuse.keptPositions)
+        for index in reuse.resumeSegment..<segments.count {
+            let isLast = index == segments.count - 1
+            switch segments[index] {
+            case let .text(tokens):
+                let offset = index == reuse.resumeSegment ? reuse.resumeTokenOffset : 0
+                position = try decodeText(Array(tokens[offset...]), from: position, wantLogits: isLast)
+            case .media:
+                guard let multimodal, let chunk = chunks.chunk(at: index) else { throw LlamaError.decodeFailed(-1) }
+                var newPosition: llama_pos = position
+                let status = mtmd_helper_eval_chunk_single(multimodal, context, chunk, position, 0, batchSize, isLast, &newPosition)
+                guard status == 0 else { promptCache.reset(); throw LlamaError.decodeFailed(status) }
+                position = newPosition
+            }
+        }
+        return Evaluation(segments: segments, nextPosition: position, promptTokens: needed, reusedPositions: reuse.keptPositions)
+    }
+
+    private func evaluateFromStart(chunks: TokenizedPrompt, segments: [PromptSegment]) throws -> Evaluation {
+        var position: llama_pos = 0
+        for (index, segment) in segments.enumerated() {
+            let isLast = index == segments.count - 1
+            switch segment {
+            case let .text(tokens):
+                position = try decodeText(tokens, from: position, wantLogits: isLast)
+            case .media:
+                guard let multimodal, let chunk = chunks.chunk(at: index) else { throw LlamaError.decodeFailed(-1) }
+                var newPosition: llama_pos = position
+                let status = mtmd_helper_eval_chunk_single(multimodal, context, chunk, position, 0, batchSize, isLast, &newPosition)
+                guard status == 0 else { promptCache.reset(); throw LlamaError.decodeFailed(status) }
+                position = newPosition
+            }
+        }
+        return Evaluation(segments: segments, nextPosition: position, promptTokens: segments.reduce(0) { $0 + $1.tokenCount }, reusedPositions: 0)
+    }
+
+    private func decodeText(_ tokens: [Int32], from start: llama_pos, wantLogits: Bool) throws -> llama_pos {
+        var position = start
+        var offset = 0
+        var batchTokens = tokens
+        while offset < batchTokens.count {
+            let length = min(Int(batchSize), batchTokens.count - offset)
+            var batch = batchTokens.withUnsafeMutableBufferPointer { buffer in
+                llama_batch_get_one(buffer.baseAddress! + offset, Int32(length))
+            }
+            // llama_batch_get_one numbers positions from the cache's end; set them explicitly so a
+            // resumed text run lands where it should.
+            let positions = (0..<length).map { position + llama_pos($0) }
+            var positionsCopy = positions
+            let status: Int32 = positionsCopy.withUnsafeMutableBufferPointer { positionBuffer in
+                batch.pos = positionBuffer.baseAddress
+                return batchTokens.withUnsafeMutableBufferPointer { tokenBuffer in
+                    batch.token = tokenBuffer.baseAddress! + offset
+                    return llama_decode(context, batch)
+                }
+            }
+            if status != 0 { promptCache.reset(); throw LlamaError.decodeFailed(status) }
+            position += llama_pos(length)
+            offset += length
+        }
+        return position
     }
 
     private var mediaMarker: String {
         multimodal.flatMap { mtmd_get_marker($0) }.map { String(cString: $0) } ?? String(cString: mtmd_default_marker())
     }
 
-    private func evaluateText(prompt: String) throws -> Int32 {
-        let utf8Count = Int32(prompt.utf8.count)
-        var tokens = [llama_token](repeating: 0, count: Int(utf8Count) + 16)
-        let count = llama_tokenize(vocab, prompt, utf8Count, &tokens, Int32(tokens.count), true, true)
-        guard count >= 0 else { throw LlamaError.tokenizeFailed(count) }
-        guard Int(count) < contextSize else { throw LlamaError.promptTooLong(Int(count), contextSize) }
-        var offset = 0
-        while offset < Int(count) {
-            let length = min(Int(batchSize), Int(count) - offset)
-            let status = tokens.withUnsafeMutableBufferPointer { buffer in
-                llama_decode(context, llama_batch_get_one(buffer.baseAddress! + offset, Int32(length)))
-            }
-            if status != 0 { throw LlamaError.decodeFailed(status) }
-            offset += length
+    /// The prompt split into text runs and media, with the mtmd chunks kept alive for evaluation.
+    struct TokenizedPrompt {
+        let handle: OpaquePointer?
+        let segments: [PromptSegment]
+
+        func chunk(at index: Int) -> OpaquePointer? {
+            guard let handle else { return nil }
+            return mtmd_input_chunks_get(handle, index)
         }
-        return count
     }
 
     /// `media` holds image and audio files in prompt order; mtmd tells them apart by their bytes.
-    private func evaluateMultimodal(prompt: String, media: [Data], multimodal: OpaquePointer) throws -> Int32 {
+    private func tokenize(prompt: String, media: [Data]) throws -> TokenizedPrompt {
+        guard let multimodal else {
+            // Text only: one run of tokens.
+            let utf8Count = Int32(prompt.utf8.count)
+            var tokens = [llama_token](repeating: 0, count: Int(utf8Count) + 16)
+            let count = llama_tokenize(vocab, prompt, utf8Count, &tokens, Int32(tokens.count), true, true)
+            guard count >= 0 else { throw LlamaError.tokenizeFailed(count) }
+            return TokenizedPrompt(handle: nil, segments: [.text(Array(tokens.prefix(Int(count))))])
+        }
         var bitmaps: [OpaquePointer?] = []
         defer { bitmaps.forEach { if let bitmap = $0 { mtmd_bitmap_free(bitmap) } } }
         for item in media {
@@ -343,21 +452,33 @@ final class LlamaRuntime: @unchecked Sendable {
         }
 
         guard let chunks = mtmd_input_chunks_init() else { throw LlamaError.tokenizeFailed(-1) }
-        defer { mtmd_input_chunks_free(chunks) }
         let status: Int32 = prompt.withCString { cString in
             var text = mtmd_input_text(text: cString, text_len: strlen(cString), add_special: true, parse_special: true)
             return bitmaps.withUnsafeMutableBufferPointer { buffer in
                 mtmd_tokenize(multimodal, chunks, &text, buffer.baseAddress, buffer.count)
             }
         }
-        guard status == 0 else { throw LlamaError.tokenizeFailed(status) }
-        let needed = mtmd_helper_get_n_tokens(chunks)
-        guard needed < contextSize else { throw LlamaError.promptTooLong(needed, contextSize) }
-
-        var newPast: llama_pos = 0
-        let evaluated = mtmd_helper_eval_chunks(multimodal, context, chunks, 0, 0, batchSize, true, &newPast)
-        guard evaluated == 0 else { throw LlamaError.decodeFailed(evaluated) }
-        return newPast
+        guard status == 0 else {
+            mtmd_input_chunks_free(chunks)
+            throw LlamaError.tokenizeFailed(status)
+        }
+        var segments: [PromptSegment] = []
+        for index in 0..<mtmd_input_chunks_size(chunks) {
+            guard let chunk = mtmd_input_chunks_get(chunks, index) else { continue }
+            if mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_TEXT {
+                var count = 0
+                let pointer = mtmd_input_chunk_get_tokens_text(chunk, &count)
+                segments.append(.text(pointer.map { Array(UnsafeBufferPointer(start: $0, count: count)) } ?? []))
+            } else {
+                let identifier = mtmd_input_chunk_get_id(chunk).map { String(cString: $0) } ?? ""
+                segments.append(.media(
+                    id: identifier,
+                    tokens: Int(mtmd_input_chunk_get_n_tokens(chunk)),
+                    positions: Int(mtmd_input_chunk_get_n_pos(chunk))
+                ))
+            }
+        }
+        return TokenizedPrompt(handle: chunks, segments: segments)
     }
 
     private func piece(for token: llama_token) -> [UInt8] {

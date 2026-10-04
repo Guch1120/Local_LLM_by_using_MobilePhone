@@ -50,7 +50,7 @@ struct SettingsView: View {
                             .foregroundStyle(.orange)
                     }
                     Picker("コンテキスト上限", selection: $contextTokens) {
-                        ForEach([1024, 2048, 4096, 8192], id: \.self) { value in
+                        ForEach(InferenceDefaults.contextChoices, id: \.self) { value in
                             Text("\(String(value)) トークン").tag(value)
                         }
                     }

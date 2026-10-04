@@ -148,8 +148,9 @@ def main() -> int:
     history = []
     rows = []
     stopped_by = "max-turns"
+    cached_total = prompt_total = 0
     cooled_seconds = 0.0
-    print(f"{'turn':>4} {'prompt':>7} {'reply':>6} {'total':>6} {'+/turn':>7} {'time':>7} {'battery':>8}  {'heat':<8} {'tok/s':>6} finish")
+    print(f"{'turn':>4} {'prompt':>7} {'reply':>6} {'total':>6} {'+/turn':>7} {'time':>7} {'battery':>8}  {'heat':<8} {'tok/s':>6} {'cached':>7} finish")
     previous_total = 0
     temperatures = [t for t in [battery_temperature()] if t is not None]
     if temperatures:
@@ -190,6 +191,7 @@ def main() -> int:
         usage = body["usage"]
         choice = body["choices"][0]
         history.append({"role": "assistant", "content": choice["message"]["content"]})
+        cached = (usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
         recall = ""
         if expected:
             ok = all(word in choice["message"]["content"] for word in expected)
@@ -198,6 +200,8 @@ def main() -> int:
             recall = "  recall OK" if ok else "  recall WRONG"
         total = usage["total_tokens"]
         rows.append((turn, usage["prompt_tokens"], usage["completion_tokens"], total, elapsed, choice["finish_reason"]))
+        cached_total += (usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
+        prompt_total += usage["prompt_tokens"]
         celsius = battery_temperature()
         if celsius is not None:
             temperatures.append(celsius)
@@ -207,7 +211,7 @@ def main() -> int:
         battery = f"{celsius:.1f}C" if celsius is not None else "-"
         print(f"{turn:>4} {usage['prompt_tokens']:>7} {usage['completion_tokens']:>6} {total:>6} "
               f"{total - previous_total:>7} {elapsed:>6.1f}s {battery:>8}  {heat:<8} "
-              f"{(f'{speed:.1f}' if speed else '-'):>6} {choice['finish_reason']}{recall}")
+              f"{(f'{speed:.1f}' if speed else '-'):>6} {cached:>7} {choice['finish_reason']}{recall}")
         previous_total = total
         if choice["finish_reason"] == "length" and context and total >= context - 8:
             print(f"{turn:>4}  the context is full ({total}/{context} tokens)")
@@ -236,6 +240,8 @@ def main() -> int:
     print(f"turns completed: {completed}  (stopped: {reasons[stopped_by]})")
     if context:
         print(f"context used at the last turn: {rows[-1][3]}/{context} tokens")
+    if prompt_total:
+        print(f"prompt tokens served from the KV cache: {cached_total}/{prompt_total} ({100 * cached_total / prompt_total:.0f}%)")
     if recall_total:
         print(f"recall questions answered correctly: {recall_hits}/{recall_total} "
               "(what was said in earlier turns, checked automatically)")

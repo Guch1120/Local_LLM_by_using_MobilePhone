@@ -6,6 +6,10 @@ struct InferenceDefaults: Sendable, Equatable {
     let contextTokens: Int
 
     static let standard = InferenceDefaults(maxTokens: 512, temperature: 0.7, contextTokens: 4096)
+
+    /// The context sizes Settings offers. The model supports far more (Gemma 4 E2B: 131,072); the cap is what
+    /// the phone's memory and speed allow (see SPEC.md, "Context window").
+    static let contextChoices = [1024, 2048, 4096, 8192, 16384, 32768, 65536]
 }
 
 enum MessageRole: String, Codable, Sendable {
@@ -49,6 +53,9 @@ struct InferenceRequest: Sendable {
 struct TokenUsage: Sendable, Equatable {
     let promptTokens: Int
     let completionTokens: Int
+    /// Prompt tokens that were already in the KV cache from the previous request and were not
+    /// evaluated again (OpenAI's `prompt_tokens_details.cached_tokens`).
+    var cachedTokens = 0
     var totalTokens: Int { promptTokens + completionTokens }
 }
 

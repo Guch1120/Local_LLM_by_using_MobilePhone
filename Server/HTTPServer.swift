@@ -491,7 +491,8 @@ final class HTTPServer {
         [
             "prompt_tokens": usage.promptTokens,
             "completion_tokens": usage.completionTokens,
-            "total_tokens": usage.totalTokens
+            "total_tokens": usage.totalTokens,
+            "prompt_tokens_details": ["cached_tokens": usage.cachedTokens]
         ]
     }
 

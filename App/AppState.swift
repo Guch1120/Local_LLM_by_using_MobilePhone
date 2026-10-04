@@ -59,7 +59,7 @@ final class AppState: ObservableObject {
         logs = LogService(persistenceURL: Self.diagnosticsLogURL())
         let savedPort = UserDefaults.standard.integer(forKey: "httpPort")
         let savedContextTokens = UserDefaults.standard.integer(forKey: "contextTokens")
-        let configuredContextTokens = [1024, 2048, 4096, 8192].contains(savedContextTokens) ? savedContextTokens : InferenceDefaults.standard.contextTokens
+        let configuredContextTokens = InferenceDefaults.contextChoices.contains(savedContextTokens) ? savedContextTokens : InferenceDefaults.standard.contextTokens
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
         let configuredMaxTokens = (1...configuredContextTokens).contains(savedMaxTokens) ? savedMaxTokens : min(InferenceDefaults.standard.maxTokens, configuredContextTokens)
         let savedTemperature = UserDefaults.standard.object(forKey: "temperature") as? Double
@@ -257,8 +257,8 @@ final class AppState: ObservableObject {
             lastError = "実行中の推論が終わってから推論設定を適用してください。"
             return
         }
-        guard (1...8192).contains(maxTokens), temperature.isFinite, (0...2).contains(temperature),
-              [1024, 2048, 4096, 8192].contains(contextTokens), maxTokens <= contextTokens else {
+        guard maxTokens >= 1, temperature.isFinite, (0...2).contains(temperature),
+              InferenceDefaults.contextChoices.contains(contextTokens), maxTokens <= contextTokens else {
             lastError = "出力トークン数はコンテキスト上限以下、temperature は 0〜2 で指定してください。"
             return
         }
