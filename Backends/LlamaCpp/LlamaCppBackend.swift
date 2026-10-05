@@ -210,7 +210,8 @@ final class LlamaRuntime: @unchecked Sendable {
         var modelParams = llama_model_default_params()
         // All layers on the GPU by default. A model that does not fit in the GPU's memory (Gemma 4 E4B on an
         // 8 GB iPhone) can keep some layers on the CPU: the launch argument `-llamaGpuLayers N` sets N.
-        let gpuLayerOverride = UserDefaults.standard.object(forKey: "llamaGpuLayers") as? Int
+        // A launch argument arrives as a string, so it is read as one and converted.
+        let gpuLayerOverride = UserDefaults.standard.string(forKey: "llamaGpuLayers").flatMap { Int($0) }
         modelParams.n_gpu_layers = Int32(gpuLayerOverride ?? 999)
         guard let model = llama_model_load_from_file(modelPath, modelParams) else {
             throw LlamaError.modelLoadFailed(LlamaLogCapture.summary())
