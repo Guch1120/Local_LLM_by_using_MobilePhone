@@ -424,11 +424,13 @@ final class HTTPServer {
         var content = ""
         var finishReason = "stop"
         var exactUsage: TokenUsage?
+        var logprobs: [TokenLogprob] = []
         do {
             for try await chunk in stream {
                 content += chunk.text
                 if let reason = chunk.finishReason { finishReason = reason }
                 if let usage = chunk.usage { exactUsage = usage }
+                if let logprob = chunk.logprob { logprobs.append(logprob) }
             }
         } catch {
             let mapped = map(error)
@@ -445,11 +447,7 @@ final class HTTPServer {
             "object": "chat.completion",
             "created": Int(Date().timeIntervalSince1970),
             "model": request.model,
-            "choices": [[
-                "index": 0,
-                "message": ["role": "assistant", "content": content],
-                "finish_reason": finishReason
-            ]],
+            "choices": [choice(content: content, finishReason: finishReason, logprobs: adapted.inferenceRequest.topLogprobs == nil ? nil : logprobs)],
             "usage": usagePayload(usage)
         ]
         await session.sendJSON(response, status: 200)
@@ -484,6 +482,35 @@ final class HTTPServer {
             "created": created,
             "model": model,
             "choices": [["index": 0, "delta": delta, "finish_reason": finishReason]]
+        ]
+    }
+
+    /// One entry of `choices` for a non-streaming answer; `logprobs` follows OpenAI's `{"content": [...]}` shape.
+    private func choice(content: String, finishReason: String, logprobs: [TokenLogprob]?) -> [String: Any] {
+        var result: [String: Any] = [
+            "index": 0,
+            "message": ["role": "assistant", "content": content],
+            "finish_reason": finishReason
+        ]
+        if let logprobs {
+            result["logprobs"] = ["content": logprobs.map(logprobEntry)]
+        }
+        return result
+    }
+
+    private func logprobEntry(_ item: TokenLogprob) -> [String: Any] {
+        func bytes(_ text: String) -> [Int] { Array(text.utf8).map(Int.init) }
+        return [
+            "token": item.token,
+            "logprob": item.logprob.isFinite ? item.logprob : -9999.0,
+            "bytes": bytes(item.token),
+            "top_logprobs": item.top.map { candidate in
+                [
+                    "token": candidate.token,
+                    "logprob": candidate.logprob.isFinite ? candidate.logprob : -9999.0,
+                    "bytes": bytes(candidate.token)
+                ] as [String: Any]
+            }
         ]
     }
 

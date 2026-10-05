@@ -32,6 +32,23 @@ final class OpenAIRequestAdapterTests: XCTestCase {
         XCTAssertNil(try OpenAIRequestAdapter.adapt(Data(other.utf8)).inferenceRequest.enableThinking)
     }
 
+    func testLogprobsRequestIsOffByDefaultAndCapped() throws {
+        let plain = #"{"model":"m","messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertNil(try OpenAIRequestAdapter.adapt(Data(plain.utf8)).inferenceRequest.topLogprobs)
+
+        let off = #"{"model":"m","logprobs":false,"top_logprobs":5,"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertNil(try OpenAIRequestAdapter.adapt(Data(off.utf8)).inferenceRequest.topLogprobs)
+
+        let on = #"{"model":"m","logprobs":true,"top_logprobs":5,"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertEqual(try OpenAIRequestAdapter.adapt(Data(on.utf8)).inferenceRequest.topLogprobs, 5)
+
+        // logprobs without a count still reports the chosen token; the count is capped like OpenAI's 20.
+        let none = #"{"model":"m","logprobs":true,"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertEqual(try OpenAIRequestAdapter.adapt(Data(none.utf8)).inferenceRequest.topLogprobs, 0)
+        let many = #"{"model":"m","logprobs":true,"top_logprobs":500,"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertEqual(try OpenAIRequestAdapter.adapt(Data(many.utf8)).inferenceRequest.topLogprobs, 20)
+    }
+
     func testStreamOptionsRequestUsageChunk() throws {
         let plain = #"{"model":"mock-echo","stream":true,"messages":[{"role":"user","content":"hi"}]}"#
         XCTAssertFalse(try OpenAIRequestAdapter.adapt(Data(plain.utf8)).includeUsage)

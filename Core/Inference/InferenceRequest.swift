@@ -50,6 +50,9 @@ struct InferenceRequest: Sendable {
     /// `chat_template_kwargs.enable_thinking` of the request. nil leaves the model's own default;
     /// false asks a model that thinks before it answers (Qwen3.5) to answer at once.
     var enableThinking: Bool?
+    /// `logprobs` / `top_logprobs` of the request: how many of the most likely tokens to report at every
+    /// generated position. nil reports nothing, which keeps the normal path free of the extra work.
+    var topLogprobs: Int?
 }
 
 /// Token counts measured by the backend's tokenizer (images count as the tokens they expand to).
@@ -62,16 +65,31 @@ struct TokenUsage: Sendable, Equatable {
     var totalTokens: Int { promptTokens + completionTokens }
 }
 
+/// The probability the model gave to one token, with its most likely alternatives.
+struct TokenLogprob: Sendable, Equatable {
+    struct Candidate: Sendable, Equatable {
+        let token: String
+        let logprob: Double
+    }
+
+    let token: String
+    let logprob: Double
+    let top: [Candidate]
+}
+
 struct InferenceChunk: Sendable {
     let text: String
     let finishReason: String?
     /// Set on the final chunk by backends that can count tokens exactly.
     let usage: TokenUsage?
+    /// Set when the request asked for `top_logprobs` and the backend can report them.
+    let logprob: TokenLogprob?
 
-    init(text: String, finishReason: String? = nil, usage: TokenUsage? = nil) {
+    init(text: String, finishReason: String? = nil, usage: TokenUsage? = nil, logprob: TokenLogprob? = nil) {
         self.text = text
         self.finishReason = finishReason
         self.usage = usage
+        self.logprob = logprob
     }
 }
 

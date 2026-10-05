@@ -50,10 +50,14 @@ actor LlamaCppBackend: InferenceBackend {
         return AsyncThrowingStream { continuation in
             let task = Task.detached(priority: .userInitiated) {
                 do {
-                    let result = try runtime.generate(request: request) { text in
-                        continuation.yield(InferenceChunk(text: text))
-                        return !Task.isCancelled
-                    }
+                    let result = try runtime.generate(
+                        request: request,
+                        onLogprob: { continuation.yield(InferenceChunk(text: "", logprob: $0)) },
+                        emit: { text in
+                            continuation.yield(InferenceChunk(text: text))
+                            return !Task.isCancelled
+                        }
+                    )
                     continuation.yield(InferenceChunk(
                         text: "",
                         finishReason: result.reachedLimit ? "length" : "stop",
@@ -283,7 +287,11 @@ final class LlamaRuntime: @unchecked Sendable {
     }
 
     /// Runs one completion. `emit` receives decoded text and returns false to stop early.
-    func generate(request: InferenceRequest, emit: (String) -> Bool) throws -> GenerationResult {
+    func generate(
+        request: InferenceRequest,
+        onLogprob: (TokenLogprob) -> Void = { _ in },
+        emit: (String) -> Bool
+    ) throws -> GenerationResult {
         let (prompt, media) = formatPrompt(request.messages, enableThinking: request.enableThinking)
         let evaluation = try evaluate(prompt: prompt, media: media)
         let nPast = evaluation.nextPosition
@@ -307,6 +315,9 @@ final class LlamaRuntime: @unchecked Sendable {
         }
         for _ in 0..<max(0, budget) {
             let token = llama_sampler_sample(sampler, context, -1)
+            if let topCount = request.topLogprobs, let logprob = tokenLogprob(chosen: token, count: topCount) {
+                onLogprob(logprob)
+            }
             if llama_vocab_is_eog(vocab, token) {
                 reachedLimit = false
                 break
@@ -326,6 +337,21 @@ final class LlamaRuntime: @unchecked Sendable {
         }
         if let rest = decoder.flush(), !rest.isEmpty { _ = emit(rest) }
         return finish(limit: reachedLimit)
+    }
+
+    /// The probability of the token that was just sampled and of the `count` most likely ones, from the logits
+    /// of the position it was sampled at. Read before the token is decoded: decoding overwrites the logits.
+    private func tokenLogprob(chosen: llama_token, count: Int) -> TokenLogprob? {
+        guard count >= 0, let pointer = llama_get_logits_ith(context, -1) else { return nil }
+        let vocabularySize = Int(llama_vocab_n_tokens(vocab))
+        let logits = UnsafeBufferPointer(start: pointer, count: vocabularySize)
+        let result = LogprobMath.topLogprobs(logits: logits, chosen: Int(chosen), count: count)
+        func text(_ id: Int) -> String { String(decoding: piece(for: llama_token(id)), as: UTF8.self) }
+        return TokenLogprob(
+            token: text(Int(chosen)),
+            logprob: result.chosen,
+            top: result.top.map { TokenLogprob.Candidate(token: text($0.id), logprob: $0.logprob) }
+        )
     }
 
     struct Evaluation {

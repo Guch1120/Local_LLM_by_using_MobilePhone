@@ -410,4 +410,30 @@ final class SecurityAndModelTests: XCTestCase {
         let explicitOff = GemmaPromptFormatter.format([system, user], mediaMarker: "<m>", enableThinking: false)
         XCTAssertEqual(explicitOff.prompt, GemmaPromptFormatter.format([system, user], mediaMarker: "<m>").prompt)
     }
+
+    func testLogprobMathMatchesAHandComputedSoftmax() {
+        // logits 0, ln 2, ln 3 -> probabilities 1/6, 2/6, 3/6
+        let logits: [Float] = [0, Float(log(2.0)), Float(log(3.0))]
+        let result = logits.withUnsafeBufferPointer { LogprobMath.topLogprobs(logits: $0, chosen: 1, count: 2) }
+        XCTAssertEqual(result.top.map(\.id), [2, 1])
+        XCTAssertEqual(result.top[0].logprob, log(3.0 / 6.0), accuracy: 1e-6)
+        XCTAssertEqual(result.top[1].logprob, log(2.0 / 6.0), accuracy: 1e-6)
+        XCTAssertEqual(result.chosen, log(2.0 / 6.0), accuracy: 1e-6)
+    }
+
+    func testLogprobMathDoesNotOverflowOnLargeScores() {
+        let logits: [Float] = [95, 94, 10]
+        let result = logits.withUnsafeBufferPointer { LogprobMath.topLogprobs(logits: $0, chosen: 0, count: 1) }
+        XCTAssertTrue(result.chosen.isFinite)
+        XCTAssertEqual(result.chosen, -log(1 + exp(-1.0)), accuracy: 1e-5)
+    }
+
+    func testLogprobMathHandlesCountZeroAndEmptyInput() {
+        let logits: [Float] = [1, 2, 3]
+        let none = logits.withUnsafeBufferPointer { LogprobMath.topLogprobs(logits: $0, chosen: 2, count: 0) }
+        XCTAssertTrue(none.top.isEmpty)
+        XCTAssertTrue(none.chosen.isFinite)
+        let empty = UnsafeBufferPointer<Float>(start: nil, count: 0)
+        XCTAssertTrue(LogprobMath.topLogprobs(logits: empty, chosen: 0, count: 3).top.isEmpty)
+    }
 }

@@ -81,7 +81,8 @@ enum OpenAIRequestAdapter {
                 messages: messages,
                 maxTokens: maxTokens,
                 temperature: temperature,
-                enableThinking: input.chatTemplateKwargs?.enableThinking
+                enableThinking: input.chatTemplateKwargs?.enableThinking,
+                topLogprobs: (input.logprobs ?? false) ? min(max(input.topLogprobs ?? 0, 0), 20) : nil
             ),
             stream: input.stream ?? false,
             includeUsage: input.streamOptions?.includeUsage ?? false
@@ -175,6 +176,8 @@ private struct OpenAIChatRequest: Decodable {
     let temperature: Double?
     let streamOptions: OpenAIStreamOptions?
     let chatTemplateKwargs: OpenAIChatTemplateKwargs?
+    let logprobs: Bool?
+    let topLogprobs: Int?
 
     enum CodingKeys: String, CodingKey {
         case model, messages, stream, temperature
@@ -182,6 +185,8 @@ private struct OpenAIChatRequest: Decodable {
         case maxCompletionTokens = "max_completion_tokens"
         case streamOptions = "stream_options"
         case chatTemplateKwargs = "chat_template_kwargs"
+        case logprobs
+        case topLogprobs = "top_logprobs"
     }
 }
 
