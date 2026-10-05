@@ -64,6 +64,9 @@ enum TemplatePromptFormatter {
 
     /// The empty reasoning block that tells a model which thinks first to answer at once.
     static let closedThinkingBlock = "<think>\n\n</think>\n\n"
+    /// The opening of a reasoning block. A model that is asked to think starts its answer with it;
+    /// without it a model may skip the reasoning when the prompt asks for a short answer.
+    static let openThinkingBlock = "<think>\n"
 
     /// True when the model's chat template has a thinking mode (it writes `</think>`).
     static func supportsThinkingSwitch(template: String?) -> Bool {
@@ -97,8 +100,12 @@ enum TemplatePromptFormatter {
             ?? turns.map(\.content).joined(separator: "\n")
         // llama.cpp's template engine cannot take template variables, so the thinking switch of the
         // template (`enable_thinking: false` writes an empty reasoning block) is applied here.
-        if enableThinking == false, supportsThinkingSwitch(template: template) {
-            prompt += closedThinkingBlock
+        if supportsThinkingSwitch(template: template) {
+            if enableThinking == false {
+                prompt += closedThinkingBlock
+            } else if enableThinking == true {
+                prompt += openThinkingBlock
+            }
         }
         return (prompt, media)
     }

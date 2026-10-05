@@ -379,7 +379,9 @@ final class SecurityAndModelTests: XCTestCase {
         // Not asked to switch it off: the prompt is left as the template wrote it.
         let unset = TemplatePromptFormatter.format(messages, template: thinking, mediaMarker: "<m>")
         XCTAssertFalse(unset.prompt.contains("</think>\n\n"))
+        // Asked to think: the answer starts inside an open reasoning block, as the model's template does.
         let on = TemplatePromptFormatter.format(messages, template: thinking, mediaMarker: "<m>", enableThinking: true)
+        XCTAssertTrue(on.prompt.hasSuffix(TemplatePromptFormatter.openThinkingBlock))
         XCTAssertFalse(on.prompt.hasSuffix(TemplatePromptFormatter.closedThinkingBlock))
 
         // A model without a thinking mode gets nothing added.
