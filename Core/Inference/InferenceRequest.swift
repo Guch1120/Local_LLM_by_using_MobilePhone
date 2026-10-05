@@ -47,6 +47,9 @@ struct InferenceRequest: Sendable {
     let messages: [InferenceMessage]
     let maxTokens: Int
     let temperature: Double
+    /// `chat_template_kwargs.enable_thinking` of the request. nil leaves the model's own default;
+    /// false asks a model that thinks before it answers (Qwen3.5) to answer at once.
+    var enableThinking: Bool?
 }
 
 /// Token counts measured by the backend's tokenizer (images count as the tokens they expand to).

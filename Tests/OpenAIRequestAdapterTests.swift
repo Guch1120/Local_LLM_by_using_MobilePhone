@@ -17,6 +17,21 @@ final class OpenAIRequestAdapterTests: XCTestCase {
         XCTAssertEqual(text, "Hello from the PC")
     }
 
+    func testChatTemplateKwargsCarryTheThinkingSwitch() throws {
+        let plain = #"{"model":"m","messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertNil(try OpenAIRequestAdapter.adapt(Data(plain.utf8)).inferenceRequest.enableThinking)
+
+        let off = #"{"model":"m","chat_template_kwargs":{"enable_thinking":false},"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertEqual(try OpenAIRequestAdapter.adapt(Data(off.utf8)).inferenceRequest.enableThinking, false)
+
+        let on = #"{"model":"m","chat_template_kwargs":{"enable_thinking":true},"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertEqual(try OpenAIRequestAdapter.adapt(Data(on.utf8)).inferenceRequest.enableThinking, true)
+
+        // Other template variables are ignored instead of rejected.
+        let other = #"{"model":"m","chat_template_kwargs":{"something_else":1},"messages":[{"role":"user","content":"hi"}]}"#
+        XCTAssertNil(try OpenAIRequestAdapter.adapt(Data(other.utf8)).inferenceRequest.enableThinking)
+    }
+
     func testStreamOptionsRequestUsageChunk() throws {
         let plain = #"{"model":"mock-echo","stream":true,"messages":[{"role":"user","content":"hi"}]}"#
         XCTAssertFalse(try OpenAIRequestAdapter.adapt(Data(plain.utf8)).includeUsage)

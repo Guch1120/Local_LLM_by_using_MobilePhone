@@ -258,11 +258,13 @@ final class LlamaRuntime: @unchecked Sendable {
 
     /// Gemma 4's chat template is written out in `GemmaPromptFormatter`; every other model
     /// uses the template stored in its GGUF file.
-    private func formatPrompt(_ messages: [InferenceMessage]) -> (prompt: String, media: [Data]) {
+    private func formatPrompt(_ messages: [InferenceMessage], enableThinking: Bool?) -> (prompt: String, media: [Data]) {
         if usesGemma4Template {
             return GemmaPromptFormatter.format(messages, mediaMarker: mediaMarker)
         }
-        return TemplatePromptFormatter.format(messages, template: chatTemplate, mediaMarker: mediaMarker)
+        return TemplatePromptFormatter.format(
+            messages, template: chatTemplate, mediaMarker: mediaMarker, enableThinking: enableThinking
+        )
     }
 
     deinit {
@@ -282,7 +284,7 @@ final class LlamaRuntime: @unchecked Sendable {
 
     /// Runs one completion. `emit` receives decoded text and returns false to stop early.
     func generate(request: InferenceRequest, emit: (String) -> Bool) throws -> GenerationResult {
-        let (prompt, media) = formatPrompt(request.messages)
+        let (prompt, media) = formatPrompt(request.messages, enableThinking: request.enableThinking)
         let evaluation = try evaluate(prompt: prompt, media: media)
         let nPast = evaluation.nextPosition
 

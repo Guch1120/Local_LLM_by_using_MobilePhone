@@ -54,8 +54,16 @@ enum GemmaPromptFormatter {
 enum TemplatePromptFormatter {
     typealias Turn = (role: String, content: String)
 
+    /// The empty reasoning block that tells a model which thinks first to answer at once.
+    static let closedThinkingBlock = "<think>\n\n</think>\n\n"
+
+    /// True when the model's chat template has a thinking mode (it writes `</think>`).
+    static func supportsThinkingSwitch(template: String?) -> Bool {
+        template?.contains("</think>") == true
+    }
+
     static func format(
-        _ messages: [InferenceMessage], template: String?, mediaMarker: String
+        _ messages: [InferenceMessage], template: String?, mediaMarker: String, enableThinking: Bool? = nil
     ) -> (prompt: String, media: [Data]) {
         var media: [Data] = []
         let turns: [Turn] = messages.map { message in
@@ -76,9 +84,14 @@ enum TemplatePromptFormatter {
             }
             return (roleName(message.role), content.trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        let prompt = template.flatMap { apply($0, to: turns) }
+        var prompt = template.flatMap { apply($0, to: turns) }
             ?? apply("chatml", to: turns)
             ?? turns.map(\.content).joined(separator: "\n")
+        // llama.cpp's template engine cannot take template variables, so the thinking switch of the
+        // template (`enable_thinking: false` writes an empty reasoning block) is applied here.
+        if enableThinking == false, supportsThinkingSwitch(template: template) {
+            prompt += closedThinkingBlock
+        }
         return (prompt, media)
     }
 

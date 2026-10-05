@@ -80,7 +80,8 @@ enum OpenAIRequestAdapter {
                 model: input.model,
                 messages: messages,
                 maxTokens: maxTokens,
-                temperature: temperature
+                temperature: temperature,
+                enableThinking: input.chatTemplateKwargs?.enableThinking
             ),
             stream: input.stream ?? false,
             includeUsage: input.streamOptions?.includeUsage ?? false
@@ -173,12 +174,23 @@ private struct OpenAIChatRequest: Decodable {
     let maxCompletionTokens: Int?
     let temperature: Double?
     let streamOptions: OpenAIStreamOptions?
+    let chatTemplateKwargs: OpenAIChatTemplateKwargs?
 
     enum CodingKeys: String, CodingKey {
         case model, messages, stream, temperature
         case maxTokens = "max_tokens"
         case maxCompletionTokens = "max_completion_tokens"
         case streamOptions = "stream_options"
+        case chatTemplateKwargs = "chat_template_kwargs"
+    }
+}
+
+/// The template variables llama.cpp's server accepts under `chat_template_kwargs`; only the thinking switch is used.
+private struct OpenAIChatTemplateKwargs: Decodable {
+    let enableThinking: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case enableThinking = "enable_thinking"
     }
 }
 

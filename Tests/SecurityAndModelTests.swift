@@ -367,4 +367,26 @@ final class SecurityAndModelTests: XCTestCase {
         cache.reset()
         XCTAssertEqual(cache.reuse(for: [.text([1, 2, 3, 4])]).keptPositions, 0)
     }
+
+    func testThinkingSwitchIsOnlyAppliedToTemplatesWithAThinkingMode() {
+        let messages = [InferenceMessage(role: .user, parts: [.text("hello")])]
+        let thinking = "{{ '<|im_start|>assistant\n<think>\n' }} ... </think>"
+        let plain = "chatml"
+
+        let off = TemplatePromptFormatter.format(messages, template: thinking, mediaMarker: "<m>", enableThinking: false)
+        XCTAssertTrue(off.prompt.hasSuffix(TemplatePromptFormatter.closedThinkingBlock))
+
+        // Not asked to switch it off: the prompt is left as the template wrote it.
+        let unset = TemplatePromptFormatter.format(messages, template: thinking, mediaMarker: "<m>")
+        XCTAssertFalse(unset.prompt.contains("</think>\n\n"))
+        let on = TemplatePromptFormatter.format(messages, template: thinking, mediaMarker: "<m>", enableThinking: true)
+        XCTAssertFalse(on.prompt.hasSuffix(TemplatePromptFormatter.closedThinkingBlock))
+
+        // A model without a thinking mode gets nothing added.
+        let noThinking = TemplatePromptFormatter.format(messages, template: plain, mediaMarker: "<m>", enableThinking: false)
+        XCTAssertFalse(noThinking.prompt.contains("<think>"))
+        XCTAssertFalse(TemplatePromptFormatter.supportsThinkingSwitch(template: plain))
+        XCTAssertFalse(TemplatePromptFormatter.supportsThinkingSwitch(template: nil))
+        XCTAssertTrue(TemplatePromptFormatter.supportsThinkingSwitch(template: thinking))
+    }
 }
