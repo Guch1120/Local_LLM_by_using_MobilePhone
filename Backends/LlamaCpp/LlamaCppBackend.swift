@@ -223,8 +223,11 @@ final class LlamaRuntime: @unchecked Sendable {
         let threads = Int32(max(2, min(6, ProcessInfo.processInfo.activeProcessorCount - 2)))
         var contextParams = llama_context_default_params()
         contextParams.n_ctx = UInt32(contextTokens)
-        contextParams.n_batch = 512
-        contextParams.n_ubatch = 512
+        // An image's tokens are decoded in one batch, so a larger image budget needs a larger batch.
+        let imageBudget = UserDefaults.standard.string(forKey: "llamaImageMaxTokens").flatMap { Int($0) } ?? 0
+        let batch = UInt32(max(512, imageBudget + 64))
+        contextParams.n_batch = batch
+        contextParams.n_ubatch = batch
         contextParams.n_threads = threads
         contextParams.n_threads_batch = threads
         guard let context = llama_init_from_model(model, contextParams) else {
@@ -237,6 +240,11 @@ final class LlamaRuntime: @unchecked Sendable {
             mtmdParams.use_gpu = true
             mtmdParams.n_threads = threads
             mtmdParams.print_timings = false
+            // The projector's own limit applies unless a launch argument sets one (Gemma 4 stops at 280
+            // tokens per image; the model accepts up to 1120): `-llamaImageMaxTokens N`.
+            if let maxTokens = UserDefaults.standard.string(forKey: "llamaImageMaxTokens").flatMap({ Int32($0) }) {
+                mtmdParams.image_max_tokens = maxTokens
+            }
             guard let created = mtmd_init_from_file(projectorPath, model, mtmdParams) else {
                 llama_free(context)
                 llama_model_free(model)
