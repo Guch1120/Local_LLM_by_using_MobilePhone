@@ -4,13 +4,21 @@ import llama
 /// Builds a Gemma 4 prompt, following the model's chat template for text, image and audio turns.
 /// Images and audio clips are replaced by the mtmd media marker, in message order.
 enum GemmaPromptFormatter {
-    static func format(_ messages: [InferenceMessage], mediaMarker: String) -> (prompt: String, media: [Data]) {
+    /// Gemma 4 thinks only when the system turn starts with this token (`enable_thinking: true` in its template).
+    static let thinkingToken = "<|think|>"
+
+    static func format(
+        _ messages: [InferenceMessage], mediaMarker: String, enableThinking: Bool? = nil
+    ) -> (prompt: String, media: [Data]) {
         var prompt = ""
         var media: [Data] = []
         var remaining = messages[...]
+        let thinking = enableThinking == true ? thinkingToken : ""
         if let first = remaining.first, first.role == .system {
-            prompt += "<|turn>system\n" + text(of: first).trimmingCharacters(in: .whitespacesAndNewlines) + "<turn|>\n"
+            prompt += "<|turn>system\n" + thinking + text(of: first).trimmingCharacters(in: .whitespacesAndNewlines) + "<turn|>\n"
             remaining = remaining.dropFirst()
+        } else if !thinking.isEmpty {
+            prompt += "<|turn>system\n" + thinking + "<turn|>\n"
         }
         for message in remaining {
             let role: String

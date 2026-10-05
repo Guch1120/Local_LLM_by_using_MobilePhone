@@ -260,7 +260,7 @@ final class LlamaRuntime: @unchecked Sendable {
     /// uses the template stored in its GGUF file.
     private func formatPrompt(_ messages: [InferenceMessage], enableThinking: Bool?) -> (prompt: String, media: [Data]) {
         if usesGemma4Template {
-            return GemmaPromptFormatter.format(messages, mediaMarker: mediaMarker)
+            return GemmaPromptFormatter.format(messages, mediaMarker: mediaMarker, enableThinking: enableThinking)
         }
         return TemplatePromptFormatter.format(
             messages, template: chatTemplate, mediaMarker: mediaMarker, enableThinking: enableThinking

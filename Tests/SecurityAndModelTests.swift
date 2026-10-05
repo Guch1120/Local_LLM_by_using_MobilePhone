@@ -389,4 +389,23 @@ final class SecurityAndModelTests: XCTestCase {
         XCTAssertFalse(TemplatePromptFormatter.supportsThinkingSwitch(template: nil))
         XCTAssertTrue(TemplatePromptFormatter.supportsThinkingSwitch(template: thinking))
     }
+
+    func testGemma4ThinksOnlyWhenTheSystemTurnCarriesTheThinkingToken() {
+        let user = InferenceMessage(role: .user, parts: [.text("hi")])
+        let system = InferenceMessage(role: .system, parts: [.text("Be brief.")])
+
+        let off = GemmaPromptFormatter.format([user], mediaMarker: "<m>")
+        XCTAssertFalse(off.prompt.contains(GemmaPromptFormatter.thinkingToken))
+        XCTAssertTrue(off.prompt.hasPrefix("<|turn>user\n"))
+
+        let onWithoutSystem = GemmaPromptFormatter.format([user], mediaMarker: "<m>", enableThinking: true)
+        XCTAssertTrue(onWithoutSystem.prompt.hasPrefix("<|turn>system\n<|think|><turn|>\n<|turn>user\n"))
+
+        let onWithSystem = GemmaPromptFormatter.format([system, user], mediaMarker: "<m>", enableThinking: true)
+        XCTAssertTrue(onWithSystem.prompt.hasPrefix("<|turn>system\n<|think|>Be brief.<turn|>\n"))
+
+        // Asking for no thinking is the same as saying nothing: Gemma 4 does not think by default.
+        let explicitOff = GemmaPromptFormatter.format([system, user], mediaMarker: "<m>", enableThinking: false)
+        XCTAssertEqual(explicitOff.prompt, GemmaPromptFormatter.format([system, user], mediaMarker: "<m>").prompt)
+    }
 }
