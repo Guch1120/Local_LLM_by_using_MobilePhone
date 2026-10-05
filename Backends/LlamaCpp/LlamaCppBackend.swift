@@ -224,7 +224,8 @@ final class LlamaRuntime: @unchecked Sendable {
         var contextParams = llama_context_default_params()
         contextParams.n_ctx = UInt32(contextTokens)
         // An image's tokens are decoded in one batch, so a larger image budget needs a larger batch.
-        let imageBudget = UserDefaults.standard.string(forKey: "llamaImageMaxTokens").flatMap { Int($0) } ?? 0
+        let imageBudget = ["llamaImageMinTokens", "llamaImageMaxTokens"]
+            .compactMap { UserDefaults.standard.string(forKey: $0).flatMap { Int($0) } }.max() ?? 0
         let batch = UInt32(max(512, imageBudget + 64))
         contextParams.n_batch = batch
         contextParams.n_ubatch = batch
@@ -240,10 +241,14 @@ final class LlamaRuntime: @unchecked Sendable {
             mtmdParams.use_gpu = true
             mtmdParams.n_threads = threads
             mtmdParams.print_timings = false
-            // The projector's own limit applies unless a launch argument sets one (Gemma 4 stops at 280
-            // tokens per image; the model accepts up to 1120): `-llamaImageMaxTokens N`.
-            if let maxTokens = UserDefaults.standard.string(forKey: "llamaImageMaxTokens").flatMap({ Int32($0) }) {
-                mtmdParams.image_max_tokens = maxTokens
+            // The projector's own limits apply unless launch arguments set them. Gemma 4 allows 40 to 280
+            // tokens per image though the model accepts up to 1120. A photo that is small at native size
+            // is enlarged to reach the minimum: `-llamaImageMinTokens N`, `-llamaImageMaxTokens N`.
+            if let value = UserDefaults.standard.string(forKey: "llamaImageMinTokens").flatMap({ Int32($0) }) {
+                mtmdParams.image_min_tokens = value
+            }
+            if let value = UserDefaults.standard.string(forKey: "llamaImageMaxTokens").flatMap({ Int32($0) }) {
+                mtmdParams.image_max_tokens = value
             }
             guard let created = mtmd_init_from_file(projectorPath, model, mtmdParams) else {
                 llama_free(context)
