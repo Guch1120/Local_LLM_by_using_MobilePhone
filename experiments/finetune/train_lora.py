@@ -2,7 +2,7 @@
 Only the answer tokens carry loss. LoRA goes on the language model's linear layers; the vision and audio towers stay frozen."""
 import argparse, random, time, torch
 from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from peft import LoraConfig, get_peft_model
 from common import prompt_text, load_rows
 
 ap = argparse.ArgumentParser()
@@ -19,8 +19,10 @@ processor = AutoProcessor.from_pretrained(a.model)
 quant = None if a.no_4bit else BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
 model = AutoModelForImageTextToText.from_pretrained(a.model, dtype=torch.bfloat16, device_map="cuda", quantization_config=quant)
-if quant: model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
-else: model.gradient_checkpointing_enable()
+# peft's prepare_model_for_kbit_training would cast every non-quantized weight to fp32, including the 4.7 B parameters of
+# the per-layer embeddings (about 9 GB), which does not fit a 16 GB GPU. Gradient checkpointing alone is enough.
+model.gradient_checkpointing_enable()
+model.enable_input_require_grads()
 model = get_peft_model(model, LoraConfig(r=a.rank, lora_alpha=2 * a.rank, lora_dropout=0.05, task_type="CAUSAL_LM",
         target_modules=r".*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"))
 model.print_trainable_parameters()

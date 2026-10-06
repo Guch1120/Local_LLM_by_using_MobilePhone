@@ -13,6 +13,8 @@ def auc(rows):
 
 def analyse(path):
     d = json.load(open(path)); r = d["results"]; n = len(r)
+    if n == 0:
+        print(f"{path}: no usable answers"); return
     own = sum((x["score"] > 0) == bool(x["label"]) for x in r) / n
     scores = sorted({x["score"] for x in r})
     cands = [scores[0] - 1] + [(a + b) / 2 for a, b in zip(scores, scores[1:])] + [scores[-1] + 1]

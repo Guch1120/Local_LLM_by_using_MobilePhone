@@ -12,3 +12,11 @@ Scripts used to evaluate which vision-language model fits a robot supervisor on 
 - `finetune/` — QLoRA fine-tuning of Gemma 4 E2B in Docker (`Dockerfile`, `train_lora.py`, `eval_hf.py`).
 
 Delete the downloaded images when the experiments are finished.
+
+## Export of a fine-tuned model to the phone
+
+1. `finetune/merge.py` merges the LoRA adapter into the bf16 base and saves a Hugging Face checkpoint
+   (copy the base's `tokenizer.json` and `tokenizer_config.json` over the saved ones).
+2. llama.cpp's `convert_hf_to_gguf.py` writes an f16 GGUF (install only `gguf`; the converter's requirements downgrade transformers
+   and break the tokenizer config), then `llama-quantize ... Q4_0`.
+3. `scripts/iphone/push_model.sh model.gguf mmproj.gguf` — the vision tower is frozen, so the original mmproj is reused.
