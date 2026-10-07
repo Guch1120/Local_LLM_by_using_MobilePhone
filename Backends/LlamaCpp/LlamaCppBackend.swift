@@ -101,6 +101,7 @@ enum LlamaError: Error, LocalizedError {
     case modelLoadFailed(String?)
     case contextInitFailed(String?)
     case projectorLoadFailed(String?)
+    case adapterLoadFailed(String?)
     case mediaDecodeFailed
     case tokenizeFailed(Int32)
     case promptTooLong(Int, Int)
@@ -114,6 +115,8 @@ enum LlamaError: Error, LocalizedError {
             return Self.describe("llama.cpp could not create an inference context.", reason)
         case let .projectorLoadFailed(reason):
             return Self.describe("llama.cpp could not load the multimodal projector (mmproj).", reason)
+        case let .adapterLoadFailed(reason):
+            return Self.describe("llama.cpp could not load the LoRA adapter.", reason)
         case .mediaDecodeFailed: return "The image or audio clip could not be decoded (images: JPEG/PNG; audio: WAV, MP3 or FLAC)."
         case let .tokenizeFailed(code): return "Prompt tokenization failed (\(code))."
         case let .promptTooLong(tokens, limit):
@@ -234,6 +237,13 @@ final class LlamaRuntime: @unchecked Sendable {
         guard let context = llama_init_from_model(model, contextParams) else {
             llama_model_free(model)
             throw LlamaError.contextInitFailed(LlamaLogCapture.summary())
+        }
+        do {
+            try Self.applyLaunchArgumentAdapter(to: model, context: context, modelPath: modelPath)
+        } catch {
+            llama_free(context)
+            llama_model_free(model)
+            throw error
         }
         var multimodal: OpaquePointer?
         if let projectorPath {
@@ -570,5 +580,23 @@ struct UTF8StreamDecoder {
         guard !pending.isEmpty else { return nil }
         defer { pending.removeAll() }
         return String(decoding: pending, as: UTF8.self)
+    }
+}
+
+extension LlamaRuntime {
+    /// Applies a LoRA adapter (GGUF) on top of the model when the launch arguments name one:
+    /// `-llamaLoraPath FILE` (relative to the model's folder) and `-llamaLoraScale S` (default 1). The model owns the adapter.
+    fileprivate static func applyLaunchArgumentAdapter(to model: OpaquePointer, context: OpaquePointer, modelPath: String) throws {
+        guard let name = UserDefaults.standard.string(forKey: "llamaLoraPath") else { return }
+        let folder = URL(fileURLWithPath: modelPath).deletingLastPathComponent()
+        let path = name.hasPrefix("/") ? name : folder.appendingPathComponent(name).path
+        guard let adapter = llama_adapter_lora_init(model, path) else {
+            throw LlamaError.adapterLoadFailed(LlamaLogCapture.summary())
+        }
+        var adapters: [OpaquePointer?] = [adapter]
+        var scales: [Float] = [UserDefaults.standard.string(forKey: "llamaLoraScale").flatMap { Float($0) } ?? 1]
+        guard llama_set_adapters_lora(context, &adapters, 1, &scales) == 0 else {
+            throw LlamaError.adapterLoadFailed(LlamaLogCapture.summary())
+        }
     }
 }
