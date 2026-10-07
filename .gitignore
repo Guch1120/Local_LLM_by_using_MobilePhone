@@ -26,3 +26,5 @@ build/
 
 # Local iPhone development captures
 artifacts/iphone/
+__pycache__/
+*.pyc

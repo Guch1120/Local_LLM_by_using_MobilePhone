@@ -12,6 +12,8 @@ ap.add_argument("--epochs", type=float, default=1.0); ap.add_argument("--limit",
 ap.add_argument("--accum", type=int, default=16); ap.add_argument("--lr", type=float, default=1e-4)
 ap.add_argument("--rank", type=int, default=16); ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--no-4bit", action="store_true")
+ap.add_argument("--exclude", default="", help="comma-separated relations left out of training (a held-out-relation test)")
+ap.add_argument("--model-tag", default="")
 a = ap.parse_args()
 random.seed(a.seed); torch.manual_seed(a.seed)
 
@@ -27,7 +29,9 @@ model = get_peft_model(model, LoraConfig(r=a.rank, lora_alpha=2 * a.rank, lora_d
         target_modules=r".*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"))
 model.print_trainable_parameters()
 
-rows = load_rows(f"{a.data}/usable.json")[:a.limit]
+excluded = {r for r in a.exclude.split(",") if r}
+rows = [r for r in load_rows(f"{a.data}/usable.json") if r["relation"] not in excluded][:a.limit]
+print(f"{len(rows)} training questions; excluded relations: {sorted(excluded)}")
 steps = int(len(rows) * a.epochs) // a.accum
 opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=a.lr, weight_decay=0.0)
 sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1.0, (s + 1) / 5) * max(0.0, 1 - s / max(1, steps)))
