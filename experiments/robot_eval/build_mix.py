@@ -18,6 +18,7 @@ ap.add_argument("--det-pos", type=int, default=10**9); ap.add_argument("--det-ne
 ap.add_argument("--ident", type=int, default=10**9); ap.add_argument("--vsr", type=int, default=0)
 ap.add_argument("--frames", default="even6", choices=["even6", "last3", "even12", "firstlast"]); ap.add_argument("--task-text", action="store_true")
 ap.add_argument("--only-with-task-text", action="store_true", help="keep only detection examples that have a task description, whether or not the prompt shows it (a fair control)")
+ap.add_argument("--vsr-full-answer", action="store_true", help="old format: the whole JSON answer carries loss (dilutes the informative token)")
 ap.add_argument("--seed", type=int, default=0)
 a = ap.parse_args()
 rnd = random.Random(a.seed)
@@ -55,8 +56,14 @@ for item in ident[:a.ident]:
 if a.vsr:
     rows = json.load(open(f"{DATA}/vsr/train/usable.json")); rnd.shuffle(rows)
     for r in rows[:a.vsr]:
-        out.append({"images": [f"/data/vsr/train/images/{r['image']}"], "system": VSR_SYSTEM, "prompt": f"Statement: {r['caption']}",
-                    "answer": '{"assessment": "%s"}' % ("true" if r["label"] else "false"), "source": "vsr", "type": "vsr"})
+        verdict = "true" if r["label"] else "false"
+        example_vsr = {"images": [f"/data/vsr/train/images/{r['image']}"], "system": VSR_SYSTEM, "prompt": f"Statement: {r['caption']}",
+                       "source": "vsr", "type": "vsr"}
+        if a.vsr_full_answer:
+            example_vsr["answer"] = '{"assessment": "%s"}' % verdict
+        else:
+            example_vsr["prefix"], example_vsr["answer"] = '{"assessment": "', verdict + '"}'
+        out.append(example_vsr)
 rnd.shuffle(out)
 json.dump(out, open(a.out, "w"))
 import collections

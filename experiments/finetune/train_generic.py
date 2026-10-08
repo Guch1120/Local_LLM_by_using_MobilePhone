@@ -2,7 +2,9 @@
 Only the answer (and the end of the turn) carries loss. Same recipe as train_lora.py; build the list with
 experiments/robot_eval/build_mix.py.
 
-examples file: [{"images": ["/robot/....jpg", ...], "system": "..." or null, "prompt": "...", "answer": "..."}]
+examples file: [{"images": ["/robot/....jpg", ...], "system": "..." or null, "prompt": "...", "answer": "...", "prefix": "..."}]
+"prefix" (optional) is written at the start of the model's turn and carries no loss; use it for fixed text such as the JSON
+opening, so that the loss falls on the informative tokens only (train_lora.py does the same for VSR).
 """
 import argparse, json, random, time, torch
 from PIL import Image
@@ -43,7 +45,7 @@ def encode(example):
     content = [{"type": "image", "image": im} for im in images] + [{"type": "text", "text": example["prompt"]}]
     messages = ([{"role": "system", "content": [{"type": "text", "text": example["system"]}]}] if example.get("system") else []) \
         + [{"role": "user", "content": content}]
-    prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True) + example.get("prefix", "")
     prompt_len = processor(text=prompt, images=images, return_tensors="pt")["input_ids"].shape[1]
     batch = processor(text=prompt + example["answer"] + "<turn|>", images=images, return_tensors="pt")
     labels = batch["input_ids"].clone(); labels[:, :prompt_len] = -100

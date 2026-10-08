@@ -21,3 +21,11 @@ Delete the downloaded images when the experiments are finished.
 2. llama.cpp's `convert_hf_to_gguf.py` writes an f16 GGUF (install only `gguf`; the converter's requirements downgrade transformers
    and break the tokenizer config), then `llama-quantize ... Q4_0`.
 3. `scripts/iphone/push_model.sh model.gguf mmproj.gguf` — the vision tower is frozen, so the original mmproj is reused.
+
+## Robot benchmarks and RoboFAC training
+
+- `robot_eval/` — RoboSpatial-Home, ERQA and the real-robot RoboFAC videos (`prepare*.py`, `eval_robot.sh`, `eval_robofac_variants.sh`),
+  and the builders of the training examples (`prepare_robofac_train.py`, `build_mix.py`); `run_experiments*.sh` are the experiment queues.
+  Results: `docs/2026-10-08-robot-benchmarks.md`, `docs/2026-10-09-robofac-training.md`.
+- `finetune/train_generic.sh` trains on any list of examples (several images, optional system prompt, loss-free prefix); `--init-adapter`
+  continues from an existing adapter.
