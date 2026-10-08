@@ -82,7 +82,11 @@ struct GGUFMetadata: Sendable, Equatable {
 
         private mutating func littleEndian(_ count: Int) -> UInt64? {
             guard let bytes = take(count) else { return nil }
-            return bytes.enumerated().reduce(UInt64(0)) { $0 | UInt64($1.element) << (8 * UInt64($1.offset)) }
+            var value: UInt64 = 0
+            for (position, byte) in bytes.enumerated() {
+                value |= UInt64(byte) << UInt64(8 * position)
+            }
+            return value
         }
 
         mutating func string() -> String? {
