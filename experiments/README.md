@@ -1,6 +1,7 @@
 # Experiments
 
 Scripts used to evaluate which vision-language model fits a robot supervisor on the phone. They are not part of the app.
+Results and conclusions: `docs/2026-10-08-vsr-evaluation.md`.
 
 - `vsr/` — Visual Spatial Reasoning (VSR, Liu et al., TACL 2023, CC BY 4.0; images from COCO, CC BY 2.0).
   - `prepare.py` downloads the data (outside the repository, default `~/data/vsr`) and builds two evaluation samples

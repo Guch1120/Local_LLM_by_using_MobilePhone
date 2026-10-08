@@ -33,7 +33,7 @@ seen = rnd.sample(train, 165)
 os.makedirs(f"{DATA}/seen/images", exist_ok=True)
 for r in seen:
     link = f"{DATA}/seen/images/{r['image']}"
-    if not os.path.exists(link): os.symlink(f"{DATA}/train/images/{r['image']}", link)
+    if not os.path.exists(link): os.symlink(f"../../train/images/{r['image']}", link)
 json.dump(seen, open(f"{DATA}/seen/usable.json", "w")); print("seen:", len(seen), "questions")
 
 # a third random-split sample, disjoint from sample1 and sample2
@@ -68,9 +68,7 @@ for i in range(240):
         else: d.polygon([(x, y - 36), (x - 34, y + 28), (x + 34, y + 28)], fill=col)
     rel, truth = srnd.choice([("left", pos[0][0] < pos[1][0]), ("right", pos[0][0] > pos[1][0]),
                               ("above", pos[0][1] < pos[1][1]), ("below", pos[0][1] > pos[1][1])])
-    claim = srnd.random() < 0.5
     phrase = {"left": "to the left of", "right": "to the right of", "above": "above", "below": "below"}[rel]
-    asked_true = truth if claim else not truth
     name = f"shape{i:03d}.png"; img.save(f"{DATA}/shapes/images/{name}")
-    rows.append({"image": name, "caption": f"The {c1} {k1} is {phrase} the {c2} {k2}.", "label": int(asked_true), "relation": f"shape-{rel}"})
+    rows.append({"image": name, "caption": f"The {c1} {k1} is {phrase} the {c2} {k2}.", "label": int(truth), "relation": f"shape-{rel}"})
 json.dump(rows, open(f"{DATA}/shapes/usable.json", "w")); print("shapes:", len(rows), "true:", sum(r["label"] for r in rows))
