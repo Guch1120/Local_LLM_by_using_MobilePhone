@@ -309,8 +309,7 @@ final class HTTPServer {
                 "model": jsonValue(active.id),
                 "modalities": ["text": backend.text, "image": backend.image, "audio": backend.audio, "camera": false],
                 "features": ["streaming": backend.streaming, "tools": false, "usb_forwarding": true, "mtp": backendMetrics.multiTokenPredictionEnabled],
-                "context_tokens": jsonValue(backendMetrics.contextTokens),
-                "adapter": jsonValue(backendMetrics.adapter)
+                "context_tokens": jsonValue(backendMetrics.contextTokens), "adapter": jsonValue(backendMetrics.adapter)
             ]
             await session.sendJSON(response, status: 200)
         case ("GET", "/metrics"):
@@ -469,7 +468,6 @@ final class HTTPServer {
         response["model_load_milliseconds"] = jsonValue(backendMetrics.modelLoadMilliseconds)
         response["multi_token_prediction_enabled"] = backendMetrics.multiTokenPredictionEnabled
         response["context_tokens"] = jsonValue(backendMetrics.contextTokens)
-        response["adapter"] = jsonValue(backendMetrics.adapter)
         return response
     }
 

@@ -24,6 +24,7 @@ struct ModelAdapterPicker: View {
                 Text("選んだアダプタは、モデルをロードするときに適用されます。切り替えると、ロード済みのモデルは読み込み直されます。")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
