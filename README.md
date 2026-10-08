@@ -258,7 +258,7 @@ bash scripts/iphone/try_model.sh qwen2.5-0.5b-instruct-q4_k_m "日本の首都�
 bash scripts/iphone/try_model.sh gemma-4-e2b-it-q4_0 "何が写っていますか？" test.png                  # 画像つき
 ```
 
-モデルIDはファイル名から拡張子を除いて小文字にしたものです。画像入力には、モデルと一緒に名前に `mmproj` を含む GGUF を指定します。gated / private リポジトリは環境変数 `HF_TOKEN` にトークンを設定してください。ロードに失敗したときは `GET /logs` の `model_load_failed` に llama.cpp のエラーが記録され、`launch.sh MODEL_ID` で全出力を確認できます。iPhone 16(メモリ 8GB)では、量子化後 3GB 前後までのモデルが目安です。
+モデルIDはファイル名から拡張子を除いて小文字にしたものです。画像入力には、モデルと一緒に名前に `mmproj` を含む GGUF を指定します。LoRA アダプタの GGUF (メタデータが `general.type = adapter`) は、モデルではなくアダプタとして同じ種類のモデルに紐付き、「モデル」タブのモデルごとの「アダプタ」で選べます (選ぶまでは適用されません。切り替えるとロード済みのモデルは読み込み直されます)。gated / private リポジトリは環境変数 `HF_TOKEN` にトークンを設定してください。ロードに失敗したときは `GET /logs` の `model_load_failed` に llama.cpp のエラーが記録され、`launch.sh MODEL_ID` で全出力を確認できます。iPhone 16(メモリ 8GB)では、量子化後 3GB 前後までのモデルが目安です。
 
 TestFlight(`TestFlight` ワークフロー、手動実行)は、開発ビルドで確認できた変更を配布・共有するときに使います。
 

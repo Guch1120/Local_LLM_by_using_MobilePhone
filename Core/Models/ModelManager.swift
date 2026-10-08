@@ -5,33 +5,33 @@ struct InstalledModel: Codable, Identifiable, Sendable {
     let id: String
     let name: String
     let backend: String
-    let path: String
+    var path: String
     let sha256: String
     let sizeBytes: Int64
-    let modalities: [String]
+    var modalities: [String]
     let importedAt: Date
     /// Multimodal projector (mmproj) for llama.cpp GGUF models, if one was imported.
     var projectorPath: String?
+    /// LoRA adapters installed for this llama.cpp model; nil in registries written before adapters existed.
+    var adapters: [ModelAdapter]?
+    /// The adapter applied when the model loads; nil means none.
+    var activeAdapterID: String?
 
     var fileURL: URL { URL(fileURLWithPath: path) }
     var projectorURL: URL? { projectorPath.map { URL(fileURLWithPath: $0) } }
+    var activeAdapter: ModelAdapter? { adapters?.first { $0.id == activeAdapterID } }
 
     /// The app container path changes across reinstalls, so resolve the file by name.
     /// Image and audio input need a projector. Without one a model is text only (registries written
     /// by older builds listed image input for every LiteRT-LM model); with one, the modalities are
     /// what the last load reported, or text and image before the first load.
     func relocated(to directory: URL) -> InstalledModel {
-        InstalledModel(
-            id: id,
-            name: name,
-            backend: backend,
-            path: directory.appendingPathComponent(fileURL.lastPathComponent).path,
-            sha256: sha256,
-            sizeBytes: sizeBytes,
-            modalities: projectorPath == nil ? ["text"] : (modalities.count > 1 ? modalities : ["text", "image"]),
-            importedAt: importedAt,
-            projectorPath: projectorURL.map { directory.appendingPathComponent($0.lastPathComponent).path }
-        )
+        var copy = self
+        copy.path = directory.appendingPathComponent(fileURL.lastPathComponent).path
+        copy.modalities = projectorPath == nil ? ["text"] : (modalities.count > 1 ? modalities : ["text", "image"])
+        copy.projectorPath = projectorURL.map { directory.appendingPathComponent($0.lastPathComponent).path }
+        copy.adapters = adapters?.map { $0.relocated(to: directory) }
+        return copy
     }
 }
 
@@ -39,6 +39,8 @@ enum ModelImportError: Error, LocalizedError {
     case unsupportedFile
     case projectorWithoutModel
     case projectorTargetMissing
+    case adapterWithoutModel
+    case adapterTargetMissing
 
     var errorDescription: String? {
         switch self {
@@ -48,16 +50,20 @@ enum ModelImportError: Error, LocalizedError {
             return "Import the GGUF model before its mmproj projector file."
         case .projectorTargetMissing:
             return "The model this image projector belongs to is not installed."
+        case .adapterWithoutModel:
+            return "Import the GGUF model before its LoRA adapter file."
+        case .adapterTargetMissing:
+            return "The model this LoRA adapter belongs to is not installed."
         }
     }
 }
 
 actor ModelManager {
-    private let fileManager: FileManager
-    private let directoryURL: URL
+    let fileManager: FileManager
+    let directoryURL: URL
     private let registryURL: URL
     private let inboxURL: URL?
-    private var installedModels: [InstalledModel] = []
+    var installedModels: [InstalledModel] = []
 
     /// - Parameter inboxURL: Folder scanned by `importInbox()`. Defaults to the app's
     ///   Documents folder, which is reachable over USB and in the Files app.
@@ -71,7 +77,7 @@ actor ModelManager {
         if let data = try? Data(contentsOf: registryURL),
            let models = try? JSONDecoder().decode([InstalledModel].self, from: data) {
             installedModels = models
-                .map { $0.relocated(to: support) }
+                .map { $0.relocated(to: support).droppingMissingAdapters(fileManager) }
                 .filter { fileManager.fileExists(atPath: $0.path) }
         }
     }
@@ -86,7 +92,7 @@ actor ModelManager {
     }
 
     /// Moves model files from the inbox folder into Application Support and registers them.
-    /// Models are imported before projectors so a projector can attach to its model.
+    /// Models are imported before projectors and adapters so those can attach to their model.
     func importInbox() throws -> [InstalledModel] {
         guard let inboxURL,
               let contents = try? fileManager.contentsOfDirectory(
@@ -96,19 +102,25 @@ actor ModelManager {
         return try Self.importOrder(contents).map { try importModel(from: $0, moveSource: true) }
     }
 
-    /// Supported files, models first and projectors last, each group by name.
+    /// A GGUF file named like a LoRA adapter. The name only decides the import order; the metadata decides what the file is.
+    static func looksLikeAdapter(_ url: URL) -> Bool {
+        let name = url.lastPathComponent.lowercased()
+        return url.pathExtension.lowercased() == "gguf" && (name.contains("lora") || name.contains("adapter"))
+    }
+
+    /// Supported files, models first and projectors and adapters last, each group by name.
     static func importOrder(_ urls: [URL]) -> [URL] {
         urls
             .filter { supportedExtensions.contains($0.pathExtension.lowercased()) }
             .sorted { lhs, rhs in
-                let lhsProjector = isProjector(lhs), rhsProjector = isProjector(rhs)
-                if lhsProjector != rhsProjector { return !lhsProjector }
+                let lhsLate = isProjector(lhs) || looksLikeAdapter(lhs), rhsLate = isProjector(rhs) || looksLikeAdapter(rhs)
+                if lhsLate != rhsLate { return !lhsLate }
                 return lhs.lastPathComponent < rhs.lastPathComponent
             }
     }
 
-    /// - Parameter projectorTarget: ID of the GGUF model a projector file belongs to. Without it a
-    ///   projector attaches to the most recently imported GGUF model.
+    /// - Parameter projectorTarget: ID of the GGUF model a projector or LoRA adapter file belongs to. Without it a
+    ///   projector attaches to the most recently imported GGUF model, and an adapter to the newest model of its architecture.
     func importModel(
         from sourceURL: URL, moveSource: Bool = false, projectorTarget: String? = nil
     ) throws -> InstalledModel {
@@ -121,6 +133,9 @@ actor ModelManager {
         }
         let didAccess = sourceURL.startAccessingSecurityScopedResource()
         defer { if didAccess { sourceURL.stopAccessingSecurityScopedResource() } }
+        if fileExtension == "gguf", GGUFMetadata.read(from: sourceURL)?.isLoraAdapter == true {
+            return try importAdapter(from: sourceURL, moveSource: moveSource, targetID: projectorTarget)
+        }
 
         let fileName = sourceURL.lastPathComponent
         let name = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
@@ -215,17 +230,8 @@ actor ModelManager {
         var excludedDestination = destination
         try? excludedDestination.setResourceValues(backupValues)
 
-        installedModels[index] = InstalledModel(
-            id: target.id,
-            name: target.name,
-            backend: target.backend,
-            path: target.path,
-            sha256: target.sha256,
-            sizeBytes: target.sizeBytes,
-            modalities: ["text", "image"],
-            importedAt: target.importedAt,
-            projectorPath: destination.path
-        )
+        installedModels[index].modalities = ["text", "image"]
+        installedModels[index].projectorPath = destination.path
         try persist()
         return installedModels[index]
     }
@@ -234,12 +240,7 @@ actor ModelManager {
     func setModalities(id: String, _ modalities: [String]) {
         guard let index = installedModels.firstIndex(where: { $0.id == id }),
               installedModels[index].modalities != modalities else { return }
-        let model = installedModels[index]
-        installedModels[index] = InstalledModel(
-            id: model.id, name: model.name, backend: model.backend, path: model.path, sha256: model.sha256,
-            sizeBytes: model.sizeBytes, modalities: modalities, importedAt: model.importedAt,
-            projectorPath: model.projectorPath
-        )
+        installedModels[index].modalities = modalities
         try? persist()
     }
 
@@ -248,6 +249,9 @@ actor ModelManager {
         if fileManager.fileExists(atPath: model.path) { try fileManager.removeItem(atPath: model.path) }
         if let projector = model.projectorPath, fileManager.fileExists(atPath: projector) {
             try fileManager.removeItem(atPath: projector)
+        }
+        for adapter in model.adapters ?? [] where fileManager.fileExists(atPath: adapter.path) {
+            try fileManager.removeItem(atPath: adapter.path)
         }
         installedModels.removeAll { $0.id == id }
         try persist()
@@ -263,7 +267,7 @@ actor ModelManager {
         return try Self.sha256(fileURL: model.fileURL) == model.sha256
     }
 
-    private func persist() throws {
+    func persist() throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(installedModels).write(to: registryURL, options: .atomic)

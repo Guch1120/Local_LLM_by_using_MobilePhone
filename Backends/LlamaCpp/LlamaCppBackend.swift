@@ -11,6 +11,7 @@ actor LlamaCppBackend: InferenceBackend {
 
     private var runtime: LlamaRuntime?
     private var loadedModel: String?
+    private var loadedAdapter: String?
     private var modelLoadMilliseconds: Double?
 
     func loadModel(configuration: ModelConfiguration) async throws {
@@ -25,16 +26,19 @@ actor LlamaCppBackend: InferenceBackend {
             try LlamaRuntime(
                 modelPath: config.fileURL.path,
                 projectorPath: config.projectorURL?.path,
+                adapterPath: config.adapterURL?.path,
                 contextTokens: config.contextTokens
             )
         }.value
         loadedModel = configuration.id
+        loadedAdapter = configuration.adapterName
         modelLoadMilliseconds = Date().timeIntervalSince(start) * 1000
     }
 
     func unloadModel() async {
         runtime = nil
         loadedModel = nil
+        loadedAdapter = nil
         modelLoadMilliseconds = nil
     }
 
@@ -91,7 +95,8 @@ actor LlamaCppBackend: InferenceBackend {
             modelLoadMilliseconds: modelLoadMilliseconds,
             computeBackend: runtime == nil ? nil : "metal",
             multiTokenPredictionEnabled: false,
-            contextTokens: runtime?.contextSize
+            contextTokens: runtime?.contextSize,
+            adapter: loadedAdapter ?? runtime?.adapterName
         )
     }
 }
@@ -194,6 +199,8 @@ final class LlamaRuntime: @unchecked Sendable {
     private let multimodal: OpaquePointer?
     private let batchSize: Int32
     let contextSize: Int
+    /// File name of the LoRA adapter applied to this model, if any.
+    let adapterName: String?
     /// What the KV cache holds, so a request that continues the previous conversation only evaluates
     /// what is new. `LLAMA_PROMPT_CACHE=0` or the launch argument `-llamaPromptCache 0` turns it off (to measure what it saves).
     private var promptCache = PromptCache()
@@ -211,7 +218,7 @@ final class LlamaRuntime: @unchecked Sendable {
         llama_backend_init()
     }()
 
-    init(modelPath: String, projectorPath: String?, contextTokens: Int) throws {
+    init(modelPath: String, projectorPath: String?, adapterPath: String? = nil, contextTokens: Int) throws {
         _ = Self.backendInit
         LlamaLogCapture.reset()
         var modelParams = llama_model_default_params()
@@ -239,7 +246,7 @@ final class LlamaRuntime: @unchecked Sendable {
             throw LlamaError.contextInitFailed(LlamaLogCapture.summary())
         }
         do {
-            try Self.applyLaunchArgumentAdapter(to: model, context: context, modelPath: modelPath)
+            adapterName = try Self.applyAdapter(configuredPath: adapterPath, to: model, context: context, modelPath: modelPath)
         } catch {
             llama_free(context)
             llama_model_free(model)
@@ -584,12 +591,21 @@ struct UTF8StreamDecoder {
 }
 
 extension LlamaRuntime {
-    /// Applies a LoRA adapter (GGUF) on top of the model when the launch arguments name one:
-    /// `-llamaLoraPath FILE` (relative to the model's folder) and `-llamaLoraScale S` (default 1). The model owns the adapter.
-    fileprivate static func applyLaunchArgumentAdapter(to model: OpaquePointer, context: OpaquePointer, modelPath: String) throws {
-        guard let name = UserDefaults.standard.string(forKey: "llamaLoraPath") else { return }
-        let folder = URL(fileURLWithPath: modelPath).deletingLastPathComponent()
-        let path = name.hasPrefix("/") ? name : folder.appendingPathComponent(name).path
+    /// Applies the model's selected LoRA adapter, or else the one the launch arguments name for experiments
+    /// (`-llamaLoraPath FILE`, relative to the model's folder, and `-llamaLoraScale S`, default 1).
+    /// Returns the adapter's file name, or nil when none is applied. The model owns the adapter.
+    fileprivate static func applyAdapter(
+        configuredPath: String?, to model: OpaquePointer, context: OpaquePointer, modelPath: String
+    ) throws -> String? {
+        let path: String
+        if let configuredPath {
+            path = configuredPath
+        } else if let name = UserDefaults.standard.string(forKey: "llamaLoraPath") {
+            let folder = URL(fileURLWithPath: modelPath).deletingLastPathComponent()
+            path = name.hasPrefix("/") ? name : folder.appendingPathComponent(name).path
+        } else {
+            return nil
+        }
         guard let adapter = llama_adapter_lora_init(model, path) else {
             throw LlamaError.adapterLoadFailed(LlamaLogCapture.summary())
         }
@@ -598,5 +614,6 @@ extension LlamaRuntime {
         guard llama_set_adapters_lora(context, &adapters, 1, &scales) == 0 else {
             throw LlamaError.adapterLoadFailed(LlamaLogCapture.summary())
         }
+        return URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
     }
 }

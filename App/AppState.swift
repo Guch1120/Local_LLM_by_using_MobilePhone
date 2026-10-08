@@ -489,6 +489,45 @@ extension AppState {
         }
     }
 
+    /// Chooses the LoRA adapter a model applies, or none (nil). llama.cpp reads the adapter when the model loads,
+    /// so a loaded model is loaded again.
+    func selectAdapter(modelID: String, adapterID: String?) async {
+        await changeAdapters(modelID: modelID, failure: "アダプタを切り替えられませんでした") {
+            try await $0.setActiveAdapter(modelID: modelID, adapterID: adapterID)
+        }
+    }
+
+    func removeAdapter(modelID: String, adapterID: String) async {
+        await changeAdapters(modelID: modelID, failure: "アダプタを削除できませんでした") {
+            try await $0.removeAdapter(modelID: modelID, adapterID: adapterID)
+        }
+    }
+
+    private func changeAdapters(modelID: String, failure: String, _ change: (ModelManager) async throws -> Void) async {
+        guard !modelLoading, !benchmarkRunning else { return }
+        modelLoading = true
+        defer { modelLoading = false }
+        guard !(await inference.hasActiveGeneration()) else {
+            lastError = "実行中の推論が終わってからアダプタを変更してください。"
+            return
+        }
+        do {
+            let before = await modelManager.model(id: modelID)?.activeAdapter
+            try await change(modelManager)
+            let after = await modelManager.model(id: modelID)?.activeAdapter
+            let active = await inference.activeModel()
+            if before != after, active.loaded, active.id == modelID, let model = await modelManager.model(id: modelID) {
+                try await inference.unloadModel()
+                try await inference.loadImportedModel(model, contextTokens: contextTokens, multiTokenPredictionEnabled: multiTokenPredictionEnabled)
+            }
+            await logs.write(.info, event: "model_adapter_changed", details: "model=\(modelID) adapter=\(after?.id ?? "none")")
+            lastError = nil
+        } catch {
+            lastError = "\(failure): \(error.localizedDescription)"
+        }
+        await refresh()
+    }
+
     func removeModel(_ id: String) async {
         guard !modelLoading, !benchmarkRunning else { return }
         modelLoading = true

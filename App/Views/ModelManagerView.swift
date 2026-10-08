@@ -63,6 +63,8 @@ struct ModelManagerView: View {
                         "このアプリの Documents フォルダ（「ファイル」アプリまたは USB）に置いた .litertlm / .gguf ファイルは、"
                             + "アプリを開いたときに自動で取り込まれます。名前に mmproj を含む GGUF ファイルは、"
                             + "最後に取り込んだ GGUF モデルに画像入力用として紐付きます。"
+                            + "LoRA アダプタの GGUF ファイルは、同じ種類（アーキテクチャ）の最新のモデルに紐付き、"
+                            + "インストール済みモデルの「アダプタ」で選べます。"
                     )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -172,6 +174,7 @@ struct ModelManagerView: View {
                 }
             }
             .font(.caption)
+            ModelAdapterPicker(model: model)
         }
         .padding(.vertical, 4)
         .swipeActions(edge: .trailing) {

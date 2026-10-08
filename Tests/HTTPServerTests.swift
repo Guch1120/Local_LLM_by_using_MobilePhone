@@ -24,6 +24,7 @@ final class HTTPServerTests: XCTestCase {
         XCTAssertEqual(capabilitiesBody["server"] as? String, "iphone-local-ai")
         // The mock backend has no context window; the key is present for clients that budget prompts.
         XCTAssertTrue(capabilitiesBody.keys.contains("context_tokens"))
+        XCTAssertTrue(capabilitiesBody.keys.contains("adapter"), "the active LoRA adapter is reported (null when none)")
         let features = try XCTUnwrap(capabilitiesBody["features"] as? [String: Any])
         XCTAssertEqual(features["usb_forwarding"] as? Bool, true)
 

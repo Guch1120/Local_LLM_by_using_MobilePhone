@@ -14,6 +14,8 @@ struct BackendMetrics: Sendable {
     let multiTokenPredictionEnabled: Bool
     /// Prompt and reply together must fit in this many tokens; nil when no model is loaded.
     var contextTokens: Int?
+    /// Name of the LoRA adapter applied to the loaded model; nil when none.
+    var adapter: String?
 }
 
 protocol InferenceBackend: Sendable {

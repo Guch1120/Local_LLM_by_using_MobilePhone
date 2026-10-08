@@ -64,7 +64,9 @@ actor InferenceService {
             sha256: model.sha256,
             contextTokens: contextTokens,
             multiTokenPredictionEnabled: multiTokenPredictionEnabled,
-            projectorURL: model.projectorURL
+            projectorURL: model.projectorURL,
+            adapterURL: model.activeAdapter?.fileURL,
+            adapterName: model.activeAdapter?.name
         )
         let candidate: any InferenceBackend = model.backend == "llama.cpp" ? LlamaCppBackend() : LiteRTGemmaBackend()
         let start = Date()

@@ -101,6 +101,9 @@ struct ModelConfiguration: Sendable {
     let contextTokens: Int
     let multiTokenPredictionEnabled: Bool
     var projectorURL: URL?
+    /// A LoRA adapter (GGUF) applied on top of the model's weights; llama.cpp only.
+    var adapterURL: URL?
+    var adapterName: String?
 }
 
 enum InferenceError: Error, LocalizedError, Sendable {
