@@ -14,6 +14,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--model", default="/models/hf/gemma-4-E2B-it-qat"); ap.add_argument("--adapter")
 ap.add_argument("--data", required=True); ap.add_argument("--out", required=True)
 ap.add_argument("--format", default="native", choices=["native", "json"]); ap.add_argument("--limit", type=int, default=10**9)
+ap.add_argument("--types", default="", help="comma-separated question types to keep (for example identification/above)")
 a = ap.parse_args()
 
 SYSTEM = ("Look at the image and decide whether the statement about it is true. "
@@ -57,7 +58,9 @@ def run(item, folder):
     return {"choice": max(scores, key=scores.get)}
 
 folder = a.data
-items = json.load(open(f"{folder}/usable.json"))[:a.limit]
+items = json.load(open(f"{folder}/usable.json"))
+if a.types: items = [i for i in items if i.get("type") in a.types.split(",")]
+items = items[:a.limit]
 results, start = [], time.time()
 for item in items:
     try: r = run(item, folder)

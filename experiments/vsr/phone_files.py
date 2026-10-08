@@ -2,6 +2,7 @@
 
 usage: phone_files.py remove ID           delete a model (files and models.json entry) whose id contains ID
        phone_files.py upload LOCAL [NAME] copy a file (for example a LoRA adapter) into the model folder
+       phone_files.py set-adapter MODEL_ID ADAPTER_ID|none   choose the adapter a model applies (the app must not be running)
        phone_files.py list
 """
 import asyncio, json, os, sys
@@ -26,6 +27,13 @@ async def main():
         out = keep if isinstance(data, list) else {**data, "models": keep}
         await afc.set_file_contents(FOLDER + "models.json", json.dumps(out, indent=2).encode())
         print("models:", [m["id"] for m in keep])
+    elif cmd == "set-adapter":
+        raw = await afc.get_file_contents(FOLDER + "models.json")
+        data = json.loads(raw)
+        for m in data:
+            if m["id"] == sys.argv[2]: m["activeAdapterID"] = None if sys.argv[3] == "none" else sys.argv[3]
+        await afc.set_file_contents(FOLDER + "models.json", json.dumps(data, indent=2).encode())
+        print({m["id"]: m.get("activeAdapterID") for m in data if m["id"] == sys.argv[2]})
     elif cmd == "upload":
         path = os.path.expanduser(sys.argv[2]); name = sys.argv[3] if len(sys.argv) > 3 else os.path.basename(path)
         await afc.set_file_contents(FOLDER + name, open(path, "rb").read()); print("uploaded", name)

@@ -40,8 +40,10 @@ def ask(images, text):
     return torch.logsumexp(lp[ids["yes"]], 0).item() - torch.logsumexp(lp[ids["no"]], 0).item()
 
 PICK = {"even6": [0, 2, 4, 7, 9, 11], "last3": [9, 10, 11], "firstlast": [0, 11], "even12": list(range(12)),
-        "task6": [0, 2, 4, 7, 9, 11], "tasklast3": [9, 10, 11]}
-WORDS = {2: "two", 3: "three", 6: "six", 12: "twelve"}
+        "task6": [0, 2, 4, 7, 9, 11], "tasklast3": [9, 10, 11],
+        "tasklast1": [11], "tasklast2": [10, 11], "tasklast6": [6, 7, 8, 9, 10, 11], "taskgap4": [5, 7, 9, 11],
+        "last1": [11], "last2": [10, 11], "last6": [6, 7, 8, 9, 10, 11], "gap4": [5, 7, 9, 11]}
+WORDS = {2: "two", 3: "three", 4: "four", 6: "six", 12: "twelve"}
 
 def score(variant, item, load):
     if variant == "window":
@@ -50,7 +52,8 @@ def score(variant, item, load):
                       f"was dropped, missed its target or was knocked over)? Answer yes or no.") for w in (0, 3, 6, 9)]
         return -max(errors)
     idx = PICK[variant]
-    lead = f"These are {WORDS[len(idx)]} frames in time order from a video of a robotic arm. "
+    lead = ("This is one frame from a video of a robotic arm. " if len(idx) == 1
+            else f"These are {WORDS[len(idx)]} frames in time order from a video of a robotic arm. ")
     if variant.startswith("task"):
         question = f"The robot's task is: {item['task_text']} Was the task completed successfully? Answer yes or no."
     else:
