@@ -18,6 +18,8 @@
 | スコアの水準は、タスク (State) ごとにずれる。1 つのしきい値で全部を判定するには、揃える学習かキャリブレーションが要る | プール AUC 0.645、タスクごとの平均 0.794 (学習なし)。学習でプール 0.85 | **State ごとのしきい値を、Shadow Mode のログから決める** (§5) |
 | アダプタで精度が上がる (シミュレーションから実機へも転移) | タスクごとの平均 0.79 から 0.88〜0.93 | 公開データで作った基礎アダプタを使い、自前のデータで追加学習する (§6) |
 | 失敗の種類 (原因の分類) は、公開データの学習では改善できていない | ベース 52.5%、学習後 45.8% | 今回の API では、失敗の種類を**返さない** (理由の文章は任意) |
+| スコアは、**学習後はそのままでも確率に近く、タスクごとに補正すると信頼できる** | ECE 0.05 (そのまま)、Brier 0.09〜0.10 (タスクごとに補正。常に失敗と答える基準は 0.162)。学習前は ECE 0.115 | 確率は、スコアから **State ごとに補正して**作る。**生成文の中の数字の自己申告は使わない** (未検証) |
+| 未知のタスクへの汎化 | 学習から除いたタスクでも、AUC 0.95〜1.00 (除かなかったときと同等) | 新しい State でも、基礎アダプタのまま使い始められる見込み (似た系統の作業。別の種類の作業は未検証) |
 | iPhone の応答時間 | 画像 1 枚で約 2 秒、3 枚で約 5〜6 秒 (thinking なし) | Phase 5 (記録だけ) には十分。State ごとに 1 回なので、画像は 1〜3 枚に抑える |
 | **関節角度などの数値を渡したときの効果は、未検証** | 評価データに数値が含まれない | §4 の数値ブロックは、**自前データでの比較実験をしてから採用する** |
 
@@ -34,18 +36,30 @@
 {
   "request_id": "uuid",
   "timestamp": "2026-10-09T16:30:00+09:00",
+  "behavior": {
+    "name": "PickAndPlace",
+    "description": "Pick up the red cube from the table and put it into the box.",
+    "states": [
+      {"name": "MoveToPregrasp", "description": "Move the arm above the cube."},
+      {"name": "CloseGripper", "description": "Close the gripper on the cube."},
+      {"name": "MoveToBox", "description": "Carry the cube above the box."}
+    ],
+    "current_index": 1,
+    "history": [{"state": "MoveToPregrasp", "outcome": "done"}]
+  },
   "state": {
     "name": "CloseGripper",
-    "path": "/Pick/CloseGripper",
-    "description": "Close the gripper on the target object.",
+    "path": "/PickAndPlace/CloseGripper",
+    "description": "Close the gripper on the cube.",
     "outcome": "done",
     "available_outcomes": ["done", "failed"]
   },
   "task_instruction": "Pick up the red cube and put it into the box.",
   "images": [{"name": "image_0", "role": "state_end", "camera": "realsense_color", "stamp": "..."}],
   "robot_state": {
-    "joint_positions": {"unit": "rad", "values": {"joint1": 0.12, "joint2": -0.4}},
-    "gripper": {"opening": 0.012, "unit": "m", "closed_means": "fully closed is 0.0"},
+    "joint_state": {"unit": "rad", "names": ["joint1", "joint2"], "position": [0.12, -0.4], "velocity": [0.0, 0.0]},
+    "gripper": {"opening": 0.012, "unit": "m", "note": "0.0 is fully closed"},
+    "odom": {"frame": "odom", "position": [0.0, 0.0, 0.0], "yaw": 0.0, "linear_velocity": 0.0},
     "objects": [{"label": "red cube", "pose_in_base": [0.31, -0.02, 0.05], "unit": "m"}]
   },
   "options": {"reason": false, "include_robot_state": false}
@@ -53,7 +67,9 @@
 ```
 
 - `state.description` は、手書きの成功条件ではなく、「その State が何を目的とするか」程度 (仕様 §38 のとおり)。
-- `robot_state` は**任意**。`options.include_robot_state` が true のときだけ、プロンプトに入る (検証が済むまでは false)。
+- **`behavior` は、実行中の Behavior 全体の説明と、State の並び、いま何番目か、これまでの State の結果**。State の説明だけだと、判断が局所的になる (その State の直前に何が起きたか、全体で何を達成しようとしているかが分からない) ため。実験で確かめたのは「タスク全体の目標 + 作業が終わった時点の画像」の形で、**State 単位の判断に、Behavior の説明がどれだけ効くかは未検証** (§7 の比較実験に含める)。プロンプトに 100〜300 トークン増える見積もり。
+- **`robot_state.joint_state` は常に渡す**。`odom` は**あるときだけ** (Piper 単体のときは省く)。`gripper`、`objects` (SAM3 など) も、あるときだけ。いずれも、プロンプトに入れる形 (テキスト、要約) は、§7 の比較で決める。数値は単位を付け、桁を揃える。
+- `options.include_robot_state` が true のときだけ、`robot_state` をプロンプトに入れる (検証が済むまでは false が既定)。
 - `images` の `role` は、`state_end`、`state_start`、`previous` など。
 
 ### 3.2 レスポンス
@@ -78,7 +94,14 @@
 - `reason`: `options.reason` が true のときだけ、判断後に短い文 (最大 60 トークン) を追加で生成する。追加で約 2〜3 秒。
 - エラー: 400 (入力不正、画像なし)、401、503 (モデル未ロード)、413 (コンテキスト超過)、429 (推論中)。既存のエラー形式 (`error.type`, `error.message`) を使う。
 
-### 3.3 アプリ側の実装方針
+### 3.3 画像の大きさ (採用する案)
+
+- **長辺 640〜800 px 程度に縮小して、JPEG 品質 85 で送る** (RealSense の 640×480 はそのまま。1280×720 なら 848×480 に縮小)。**拡大はしない**。
+- 根拠: モデルは、画像を 1 枚あたり最大 280 トークンに収める (48 px 四方が 1 トークン。640×480 で約 130 トークン、848×480 で約 180 トークン)。評価した画像 (COCO、RoboFAC) は 640×480 程度で、この大きさで成否 AUC 0.85 まで出ている。1 枚の処理は約 1.5 秒で、枚数に比例する (3 枚で約 5 秒)。
+- トークン数を増やすと、VSR では AUC が上がった (280 → 560 トークンで 0.62 → 0.70) が、約 6 倍遅くなり、1120 トークンはメモリ不足でアプリが落ちた。Supervisor 用には、**解像度を上げるより、細部が必要なら対象物の周りを切り出した画像を足す**ほうが現実的と考えられる (未検証)。
+- 枚数は最大 2 枚 (State 終了時、必要なら State 開始時)。
+
+### 3.4 アプリ側の実装方針
 
 - **JSON を生成させない。** 答えは「Yes か No の 1 トークン目の確率」で決まるので、`assessment` の JSON は、アプリが組み立てる。構造化出力の失敗 (JSON が壊れる) を、そもそも起こさない。
 - プロンプトは、評価したものと**同じ文面**にする: 「These are N frames in time order … The robot's task is: {state.description} Was the task completed successfully? Answer yes or no.」(`state.outcome` や `task_instruction` は、補足として後ろに足す形を、別途評価してから決める)。
@@ -114,14 +137,22 @@
 - 小さなモデル (E2B) が、数値の表から判断できるかも未知。**数値は、(a) 渡さない、(b) テキストで渡す、(c) 要約して渡す、の 3 通りを自前データで比較して決める**。
 - 自前データは、Phase 5 の Shadow Mode が自然に集める (rosbag + 人間のラベル)。別に収集作業を設けなくても、Phase 5 の運用そのものが、この比較のデータになる。
 
-## 8. 決めてほしいこと / 確認したいこと
+## 8. 決まったこと / 決めてほしいこと
 
-1. **画像**: RealSense の RGB を、JPEG で、どの解像度で送るか (現在は最大 280 トークンの 640×480 程度で評価)。State の開始時と終了時の 2 枚が必要か。
-2. **数値**: どの値を渡したいか (関節角、グリッパの開き、TF、SAM3 の物体情報、オドメトリなど)。最初の検証では、どれを対象にするか。
-3. **State の説明**: どの FlexBE State から始めるか (最初は 3〜5 個を想定)。説明文は、誰が、どの粒度で書くか。
-4. **出力の語彙**: `semantic_success` / `semantic_failure` / `uncertain` で足りるか。失敗の種類 (原因) が必要なら、**公開データでは改善できていない**ので、自前の失敗例で学習する必要がある。
-5. **応答時間の目安**: Phase 5 は記録だけなので問題ないが、Phase 6 (介入) では、画像 1 枚で約 2 秒、`reason` 付きで約 5 秒が許されるか。
-6. **API の形**: 専用の `POST /v1/supervisor/evaluate` を作るのと、既存の OpenAI 互換 API に `chat_template_kwargs` などで寄せるのと、どちらがよいか (推奨: 専用 API。JSON の組み立てをアプリ側で固定でき、画像を multipart で送れる)。
+決まったこと (ユーザーの回答):
+
+- 専用 API (multipart: `context.json` + 画像) を新設する。
+- 画像は、必要な大きさまで縮小する (§3.3 の案を採用)。
+- 数値は `joint_state` を渡す。`odom` はあるときだけ (Piper 単体のときは省く)。
+- State の説明に加えて、実行中の Behavior の説明も渡す。
+- 失敗の種類 (原因) の改善は必要。Piper や FlexBE の State 専用にせず、汎化できるものにする (現状は未達。§2 と `2026-10-09-robofac-training.md` §6.3)。
+
+決めてほしいこと:
+
+1. **最初に試す Behavior と State**: 3〜5 個の State から始める想定。どの Behavior か。
+2. **出力の語彙**: `semantic_success` / `semantic_failure` / `uncertain` で足りるか。失敗の種類を返すのは、識別精度が上がるまで保留でよいか。
+3. **`reason` (理由の文)**: 必要か。必要なら、いつ生成するか (常に / 失敗のときだけ)。
+4. **`confidence`**: スコアから State ごとに補正して作る方針でよいか (生成文の自己申告は使わない)。
 
 ## 9. 進め方 (案)
 
