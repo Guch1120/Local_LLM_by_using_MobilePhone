@@ -12,7 +12,7 @@
 | **RoboSpatial-Home「収まるか」** | 実際の室内写真 1 枚 | 「Can the tissue box fit left of the vacuum?」 | yes / no | 0.5 | 空きスペースに物が入るか (大きさと空きの見積もり) |
 | **ERQA** | 写真 1〜数枚 | 「What's the state of the drawer?」「If the yellow robot gripper follows the yellow trajectory, what will happen?」 | 選択肢 A〜D (4 択) | 約 25% | ロボット向けの具体的な推論 (空間、状態推定、軌道、行動、複数視点、ポインティングなど 8 種類) |
 | **RoboFAC「成否」** | 実機ロボットの動画から取り出したフレーム + タスク文 | 「The robot's task is: Insert the cylinder into the middle hole of the shelf. Was the task completed successfully?」 | yes / no | AUC 0.5 | 作業が成功したか。成功 244 本、失敗 960 本の動画 (SO-100 アーム、6 タスク) |
-| **RoboFAC「失敗の種類」** | 同上 (失敗した動画だけ) | 「Please describe the error type …」(選択肢: Orientation deviation / Grasping error / Position deviation) | 選択肢 A〜C (主に 3 択) | 約 33% | 失敗の原因の分類 |
+| **RoboFAC「失敗の種類」** | 同上 (失敗した動画だけ) | 「Please describe the error type …」(選択肢: Orientation deviation / Grasping error / Position deviation) | 選択肢 A〜C (3 択) | 33%。ただし**常に C と答えると 58.3%** | 失敗の原因の分類 |
 | **RoboFAC「失敗した場面」** | 同上 | 「during which subtask did the error happen?」 | 選択肢 A〜E (5 択) | 20% | **実際は「何の作業か」の識別** (§2) |
 
 指標: Yes/No と true/false の試験は、**ROC-AUC** (成功と失敗の問題を、スコアでどれだけ分けられるか。0.5 が偶然、1.0 が完全) と、閾値 0 での正答率。選択式は正答率。AUC は、「true と答えにくい癖」などの偏りに左右されない。
@@ -33,7 +33,7 @@
 | ERQA 作業推論 | 2 択 (成否の判定を含む) | 「Was the task successful: put carrot in plate」 A. No. B. Yes. |
 | ERQA 行動推論 | 4 択 | 「How do you need to rotate the dumbbell for it to fit back in the weight holder?」 A. Rotate clockwise 90 degrees. B. Rotate counter-clockwise 90 degrees. C. Rotate 180 degrees. D. No change needed. |
 | RoboFAC「成否」 | Yes / No | `Yes` (成功) / `No` (失敗) |
-| RoboFAC「失敗の種類」 | 3 択 (全 480 問で同じ 3 つ。文字の割り当ては問題ごとに変わる) | `Grasping error` (つかみの失敗) / `Orientation deviation` (向きのずれ) / `Position deviation` (位置のずれ) |
+| RoboFAC「失敗の種類」 | 3 択 (全 480 問で同じ 3 つ、同じ並び) | A. `Orientation deviation` (向きのずれ) / B. `Grasping error` (つかみの失敗) / C. `Position deviation` (位置のずれ)。正解の割合は C が 58%、B が 29%、A が 12.5% |
 | RoboFAC「失敗した場面」 | 5 択 | InsertCylinder の例: Rotate the box to an upright position / Pull the green cube off the turntable / Move the LEGO brick behind the cup / **Reach for the cylinder on the table** (答え) / Move the plug toward the USB slot。他のタスクの作業が混ざる |
 
 ERQA の選択肢の数は、4 択が 378 問、2 択が 14 問、3 択が 6 問、選択肢なしが 2 問 (400 問中)。
