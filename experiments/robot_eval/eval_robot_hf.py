@@ -14,6 +14,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--model", default="/models/hf/gemma-4-E2B-it-qat"); ap.add_argument("--adapter")
 ap.add_argument("--data", required=True); ap.add_argument("--out", required=True)
 ap.add_argument("--format", default="native", choices=["native", "json"]); ap.add_argument("--limit", type=int, default=10**9)
+ap.add_argument("--max-soft-tokens", type=int, default=0, help="image token budget per frame (the processor default is 280; video input uses 70)")
 ap.add_argument("--types", default="", help="comma-separated question types to keep (for example identification/above)")
 a = ap.parse_args()
 
@@ -22,6 +23,7 @@ SYSTEM = ("Look at the image and decide whether the statement about it is true. 
 PREFIX = '{"assessment": "'
 
 processor = AutoProcessor.from_pretrained(a.model)
+if a.max_soft_tokens: processor.image_processor.max_soft_tokens = a.max_soft_tokens
 model = AutoModelForImageTextToText.from_pretrained(a.model, dtype=torch.bfloat16, device_map="cuda")
 if a.adapter:
     from peft import PeftModel
