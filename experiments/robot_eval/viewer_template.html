@@ -1,0 +1,153 @@
+<title>RoboFAC 失敗ビューア</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+/* Layout: a review desk. A quiz-style list of failed runs; the six frames come first, the answer stays hidden until the reader has guessed. */
+:root {
+  --bg: #f3f5f6; --surface: #ffffff; --ink: #1c2327; --muted: #5d6a72; --line: #d6dde1;
+  --accent: #0b6b78; --accent-soft: #dcecee; --ok: #1f7a43; --ok-soft: #dff0e5; --bad: #b3361d; --bad-soft: #f6e0db;
+  --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181b; --surface: #1a2226; --ink: #e6ecef; --muted: #96a5ad; --line: #2c383e;
+    --accent: #5fc0cd; --accent-soft: #1b3a40; --ok: #5fcf8a; --ok-soft: #1b3326; --bad: #f08a72; --bad-soft: #3d2420; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181b; --surface: #1a2226; --ink: #e6ecef; --muted: #96a5ad; --line: #2c383e;
+  --accent: #5fc0cd; --accent-soft: #1b3a40; --ok: #5fcf8a; --ok-soft: #1b3326; --bad: #f08a72; --bad-soft: #3d2420; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); line-height: 1.65; padding-inline: 16px; padding-block: 28px 56px; }
+.wrap { max-width: 1040px; margin-inline: auto; display: flex; flex-direction: column; gap: 22px; }
+h1 { font-size: clamp(1.5rem, 1.2rem + 1.6vw, 2.2rem); line-height: 1.25; margin: 0; text-wrap: balance; font-weight: 700; }
+.kicker { font: 500 0.75rem/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+.lede { margin: 10px 0 0; max-width: 62ch; color: var(--muted); }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.legend div { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; min-width: 0; }
+.legend b { display: block; font-weight: 700; }
+.legend span { color: var(--muted); font-size: 0.86rem; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: inherit; color: inherit; }
+.chip, .choice, .ghost { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 0.86rem; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.score { font: 500 0.86rem var(--font-mono); font-variant-numeric: tabular-nums; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+.ghost { border-radius: 6px; padding: 2px 10px; font-size: 0.8rem; color: var(--muted); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.task { font: 500 0.82rem var(--font-mono); background: var(--accent-soft); color: var(--accent); padding: 1px 8px; border-radius: 4px; }
+.goal { font-weight: 500; min-width: 0; flex: 1 1 260px; }
+.id { font: 400 0.72rem var(--font-mono); color: var(--muted); }
+.frames { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.frame { position: relative; line-height: 0; }
+.frame img { width: 100%; height: auto; border-radius: 3px; display: block; }
+.frame i { position: absolute; left: 4px; top: 4px; font: 500 0.68rem/1 var(--font-mono); background: rgba(0,0,0,0.62); color: #fff; padding: 2px 5px; border-radius: 3px; font-style: normal; }
+.ask { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ask p { margin: 0; font-weight: 500; flex-basis: 100%; }
+.choice { border-radius: 6px; padding: 6px 14px; }
+.choice:hover { border-color: var(--accent); }
+.choice.right { background: var(--ok-soft); border-color: var(--ok); }
+.choice.wrong { background: var(--bad-soft); border-color: var(--bad); }
+.result { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.verdict { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+.verdict .answer { font-weight: 700; font-size: 1.05rem; }
+.picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick { font-size: 0.82rem; padding: 2px 10px; border-radius: 4px; border: 1px solid var(--line); }
+.pick.right { background: var(--ok-soft); border-color: var(--ok); }
+.pick.wrong { background: var(--bad-soft); border-color: var(--bad); }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.col { min-width: 0; font-size: 0.86rem; }
+.col h3 { font: 500 0.72rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin: 0 0 6px; }
+.col h4 { font-size: 0.78rem; color: var(--muted); margin: 8px 0 2px; font-weight: 500; }
+.col p { margin: 0; overflow-wrap: anywhere; }
+.note { font-size: 0.8rem; color: var(--muted); max-width: 70ch; }
+@media (max-width: 720px) { .frames { grid-template-columns: repeat(3, minmax(0, 1fr)); } .cols { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<main class="wrap">
+  <header>
+    <p class="kicker">RoboFAC · 実機 SO-100 アーム · 失敗した動画</p>
+    <h1>失敗の種類を、自分で当ててみる</h1>
+    <p class="lede">ロボットが作業に失敗した動画から、時間順に 6 枚のフレームを取り出しました。種類を選ぶと、正解と、モデル(ベースと、成否判定で学習した X8)の答えと説明が表示されます。</p>
+  </header>
+
+  <section class="legend" aria-label="失敗の種類">
+    <div><b>向きのずれ <small>Orientation deviation</small></b><span>物体や腕の向きが合っていない。全体の約 12%。</span></div>
+    <div><b>つかみの失敗 <small>Grasping error</small></b><span>物体をつかめない、または持ち上げられない。約 29%。</span></div>
+    <div><b>位置のずれ <small>Position deviation</small></b><span>位置が目標からずれている。約 58%(最も多い)。</span></div>
+  </section>
+
+  <section class="bar">
+    <div class="chips" id="filters" role="group" aria-label="タスクで絞り込む"></div>
+    <div class="score"><span id="score">あなたの正解 0 / 0</span><button class="ghost" id="reset" type="button">やり直す</button></div>
+  </section>
+
+  <div id="list" style="display:flex;flex-direction:column;gap:14px"></div>
+
+  <p class="note">出典: RoboFAC (MINT-SJTU、MIT ライセンス、arXiv:2505.12224)の実機データ。「データセットの正解」は、データセットに付いている注釈です。モデルの説明は、同じ 6 フレームとタスクの説明から、その場で生成した英語の文章で、内容が正しいとは限りません。3 択の答えは、モデルに選択肢から選ばせたものです。</p>
+</main>
+
+<script>
+const DATA = __DATA__;
+const CLASSES = ["向きのずれ", "つかみの失敗", "位置のずれ"];
+const state = { task: "すべて", asked: 0, right: 0, done: new Set() };
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+
+function pickBadge(name, pick, truth) {
+  const b = el("span", "pick " + (pick === truth ? "right" : "wrong"), name + ": " + (pick || "—") + (pick === truth ? " ✓" : " ✗"));
+  return b;
+}
+function column(title, t) {
+  const c = el("div", "col"); c.append(el("h3", "", title));
+  c.append(el("h4", "", "何が起きたか"), el("p", "", t.what || "—"), el("h4", "", "回復の提案"), el("p", "", t.fix || "—"));
+  return c;
+}
+function reveal(card, item, guess) {
+  const box = card.querySelector(".result"); box.hidden = false; box.replaceChildren();
+  const v = el("div", "verdict"); v.append(el("span", "", "正解"), el("span", "answer", item.ja + " (" + item.label + ")"));
+  if (guess) v.append(el("span", "", "あなたの答え: " + guess + (guess === item.ja ? " ✓" : " ✗")));
+  const picks = el("div", "picks");
+  picks.append(pickBadge("ベース", item.base_pick, item.ja), pickBadge("X8", item.x8_pick, item.ja));
+  const cols = el("div", "cols");
+  cols.append(column("データセットの正解", item.text.reference), column("モデル: ベース", item.text.base), column("モデル: X8", item.text.x8));
+  box.append(v, picks, cols);
+}
+function render() {
+  const list = document.getElementById("list"); list.replaceChildren();
+  DATA.filter(d => state.task === "すべて" || d.task === state.task).forEach(item => {
+    const card = el("article", "card");
+    const head = el("div", "head"); head.append(el("span", "task", item.task), el("span", "goal", item.task_text), el("span", "id", item.id));
+    const frames = el("div", "frames");
+    item.frames.forEach((src, k) => { const f = el("div", "frame"); const img = new Image(); img.src = src; img.alt = "フレーム " + (k + 1); f.append(img, el("i", "", String(k + 1))); frames.append(f); });
+    const ask = el("div", "ask"); ask.append(el("p", "", "この失敗は、どの種類ですか?"));
+    const result = el("div", "result"); result.hidden = true;
+    CLASSES.forEach(name => {
+      const b = el("button", "choice", name); b.type = "button";
+      b.addEventListener("click", () => {
+        if (!state.done.has(item.id)) { state.done.add(item.id); state.asked++; if (name === item.ja) state.right++; updateScore(); }
+        ask.querySelectorAll(".choice").forEach(x => { x.disabled = true; if (x.textContent === item.ja) x.classList.add("right"); else if (x === b) x.classList.add("wrong"); });
+        reveal(card, item, name);
+      });
+      ask.append(b);
+    });
+    const skip = el("button", "ghost", "答えだけ見る"); skip.type = "button";
+    skip.addEventListener("click", () => { ask.querySelectorAll(".choice").forEach(x => { x.disabled = true; if (x.textContent === item.ja) x.classList.add("right"); }); reveal(card, item, null); });
+    ask.append(skip);
+    card.append(head, frames, ask, result); list.append(card);
+  });
+}
+function updateScore() { document.getElementById("score").textContent = "あなたの正解 " + state.right + " / " + state.asked; }
+function buildFilters() {
+  const tasks = ["すべて", ...new Set(DATA.map(d => d.task))], box = document.getElementById("filters");
+  tasks.forEach(t => {
+    const b = el("button", "chip", t === "すべて" ? "すべて (" + DATA.length + ")" : t + " (" + DATA.filter(d => d.task === t).length + ")"); b.type = "button";
+    b.setAttribute("aria-pressed", String(t === state.task));
+    b.addEventListener("click", () => { state.task = t; box.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c === b))); render(); });
+    box.append(b);
+  });
+}
+document.getElementById("reset").addEventListener("click", () => { state.asked = 0; state.right = 0; state.done = new Set(); updateScore(); render(); });
+buildFilters(); render();
+</script>
