@@ -17,6 +17,7 @@ ap.add_argument("out")
 ap.add_argument("--det-pos", type=int, default=10**9); ap.add_argument("--det-neg-ratio", type=float, default=1.0)
 ap.add_argument("--ident", type=int, default=10**9); ap.add_argument("--vsr", type=int, default=0)
 ap.add_argument("--frames", default="even6", choices=["even6", "last3", "even12", "firstlast", "last1", "last2", "last6", "gap4"]); ap.add_argument("--ident-frames", default=None, choices=[None, "even6", "last3", "even12", "firstlast", "last1", "last2", "last6", "gap4"], help="frames for the error-type examples (default: same as --frames)")
+ap.add_argument("--exclude-tasks", default="", help="comma-separated simulation task families left out of the RoboFAC examples (a held-out-task test)")
 ap.add_argument("--task-text", action="store_true")
 ap.add_argument("--only-with-task-text", action="store_true", help="keep only detection examples that have a task description, whether or not the prompt shows it (a fair control)")
 ap.add_argument("--vsr-full-answer", action="store_true", help="old format: the whole JSON answer carries loss (dilutes the informative token)")
@@ -31,6 +32,8 @@ VSR_SYSTEM = ("Look at the image and decide whether the statement about it is tr
 DATA = os.path.expanduser("~/data")
 
 robofac = json.load(open(f"{DATA}/robot/robofac_train/usable.json"))
+excluded_tasks = {t for t in a.exclude_tasks.split(",") if t}
+robofac = [i for i in robofac if i["task"].split("-")[0] not in excluded_tasks]
 idx = PICK[a.frames]
 lead = ("This is one frame from a video of a robotic arm. " if len(idx) == 1
         else f"These are {WORDS[len(idx)]} frames in time order from a video of a robotic arm. ")
