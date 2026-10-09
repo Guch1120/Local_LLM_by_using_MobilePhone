@@ -28,3 +28,4 @@ build/
 artifacts/iphone/
 __pycache__/
 *.pyc
+experiments/annotate/annotations.jsonl

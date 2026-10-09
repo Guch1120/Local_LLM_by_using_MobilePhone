@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>失敗の注釈ツール</title>
+<style>
+:root { --bg:#f3f5f6; --card:#fff; --ink:#1c2327; --muted:#5d6a72; --line:#d3dbe0; --accent:#0b6b78; --soft:#dcecee; --ok:#1f7a43; --warn:#a15c00; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg:#12181b; --card:#1a2226; --ink:#e6ecef; --muted:#96a5ad; --line:#2c383e; --accent:#5fc0cd; --soft:#1b3a40; --ok:#5fcf8a; --warn:#e0a24a; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 "Noto Sans JP","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif; }
+header { position:sticky; top:0; z-index:5; background:var(--card); border-bottom:1px solid var(--line); padding:8px 16px; display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; }
+header h1 { font-size:1rem; margin:0; }
+main { max-width:1200px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); }
+@media (max-width: 900px) { main { grid-template-columns:minmax(0,1fr); } }
+.card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; min-width:0; }
+.videos { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+video { width:100%; background:#000; border-radius:4px; }
+.cam { font:500 11px/1 ui-monospace,monospace; color:var(--muted); margin:2px 0; }
+.controls { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; margin-top:8px; }
+.controls input[type=range] { flex:1 1 200px; }
+button, select, input, textarea { font:inherit; color:inherit; }
+button { border:1px solid var(--line); background:var(--card); border-radius:6px; padding:3px 10px; cursor:pointer; }
+button.primary { background:var(--accent); border-color:var(--accent); color:var(--bg); font-weight:700; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+textarea { width:100%; min-height:3.6em; border:1px solid var(--line); border-radius:6px; padding:6px; background:var(--card); }
+fieldset { border:1px solid var(--line); border-radius:6px; margin:0 0 10px; padding:8px 10px; min-width:0; }
+legend { font-weight:700; padding:0 4px; }
+label.row { display:flex; gap:6px; align-items:flex-start; margin:2px 0; }
+.chips { display:flex; flex-wrap:wrap; gap:4px; }
+.chip { font-size:12px; border-radius:999px; padding:2px 10px; }
+.chip small { color:var(--muted); }
+.plan { list-style:none; padding:0; margin:6px 0; display:flex; flex-direction:column; gap:4px; }
+.plan li { display:flex; gap:6px; align-items:center; }
+.plan input[type=text] { flex:1; min-width:0; border:1px solid var(--line); border-radius:4px; padding:2px 6px; background:var(--card); }
+.skill { font:500 12px ui-monospace,monospace; background:var(--soft); color:var(--accent); padding:1px 8px; border-radius:4px; }
+.hint { background:var(--soft); border-radius:6px; padding:8px; font-size:13px; }
+.muted { color:var(--muted); }
+.status { font:500 12px ui-monospace,monospace; color:var(--ok); }
+.task { font:500 12px ui-monospace,monospace; background:var(--soft); color:var(--accent); padding:1px 8px; border-radius:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>失敗の注釈ツール</h1>
+  <span id="progress" class="status"></span>
+  <label>注釈者 <input id="annotator" size="10"></label>
+  <label>タスク <select id="taskFilter"></select></label>
+  <label><input type="checkbox" id="pendingOnly" checked> 未注釈のみ</label>
+  <button id="prev" type="button">← 前</button><button id="next" type="button">次 →</button>
+  <span class="muted" id="where"></span>
+</header>
+<main>
+  <section class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;margin-bottom:8px">
+      <span class="task" id="task"></span><b id="goal"></b><span class="muted" id="epid"></span>
+    </div>
+    <div class="videos">
+      <div><div class="cam">above</div><video id="vA" muted playsinline preload="auto"></video></div>
+      <div><div class="cam">rightfront</div><video id="vB" muted playsinline preload="auto"></video></div>
+    </div>
+    <div class="controls">
+      <button id="play" type="button">再生 / 停止 (Space)</button>
+      <button id="back" type="button">◀ 1 コマ (←)</button><button id="fwd" type="button">1 コマ ▶ (→)</button>
+      <label>速さ <select id="speed"><option>0.25</option><option selected>0.5</option><option>1</option><option>2</option></select></label>
+      <label><input type="checkbox" id="loop" checked> くり返す</label>
+      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="再生位置">
+      <span id="time" class="muted"></span>
+    </div>
+    <div class="controls">
+      <button id="markFail" type="button">この時刻を「失敗の瞬間」に記録</button><span id="tFail" class="muted">未記録</span>
+      <button id="markStart" type="button">失敗の始まり</button><span id="tStart" class="muted">—</span>
+      <button id="markEnd" type="button">失敗の確定</button><span id="tEnd" class="muted">—</span>
+    </div>
+    <p class="muted">時刻は、動画の再生位置(秒)です。失敗の瞬間は、あとで、その前後のフレームを学習に使います。</p>
+    <div style="margin-top:8px"><button id="showHint" type="button">データセットのラベルと説明を見る(ヒント)</button>
+      <div id="hint" class="hint" hidden></div></div>
+  </section>
+
+  <section class="card">
+    <fieldset><legend>1. 動画から失敗は確認できますか</legend>
+      <label class="row"><input type="radio" name="visible" value="failure"> はい、失敗している</label>
+      <label class="row"><input type="radio" name="visible" value="looks_success"> 成功しているように見える</label>
+      <label class="row"><input type="radio" name="visible" value="unclear"> 判断できない</label>
+    </fieldset>
+    <fieldset><legend>2. 何が起きましたか(短い文)</legend>
+      <textarea id="what" placeholder="例: グリッパーが閉じる前にアームが動き出し、箱をつかめなかった"></textarea>
+    </fieldset>
+    <fieldset><legend>3. 原因の種類(複数選べます)</legend><div id="causes"></div></fieldset>
+    <fieldset><legend>4. どう回復しますか(Skill を順に追加)</legend>
+      <div id="palette"></div>
+      <ol class="plan" id="plan"></ol>
+      <label>同じ手順を繰り返すと、また失敗しそうですか。変えること(パラメータ)は?
+        <textarea id="avoid" placeholder="例: そのまま再試行だと同じ失敗をする。つかむ位置を 2 cm 手前にして、力を強くする"></textarea></label>
+      <label>一覧にないが必要な Skill <input id="missing" style="width:100%" placeholder="例: 物の向きに合わせて手首を回し、つかみ直す Skill"></label>
+    </fieldset>
+    <fieldset><legend>5. 確信度とメモ</legend>
+      <label class="row"><input type="radio" name="conf" value="3"> 高い</label>
+      <label class="row"><input type="radio" name="conf" value="2"> 中くらい</label>
+      <label class="row"><input type="radio" name="conf" value="1"> 低い(推測)</label>
+      <textarea id="notes" placeholder="メモ(任意)"></textarea>
+    </fieldset>
+    <div class="controls"><button id="save" class="primary" type="button">保存して次へ (Ctrl+Enter)</button><button id="skip" type="button">保存せず次へ</button><span id="saved" class="status"></span></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const S = { cfg: null, items: [], saved: {}, order: [], pos: 0, plan: [], hintSeen: false, tFail: null, tStart: null, tEnd: null };
+const FPS = 30;
+const vA = $("vA"), vB = $("vB");
+const src = p => "/video/" + p.split("/").map(encodeURIComponent).join("/");
+const fmt = t => (t == null ? "—" : t.toFixed(2) + " s");
+const typing = () => ["TEXTAREA", "INPUT", "SELECT"].includes(document.activeElement.tagName) && document.activeElement.type !== "range" && document.activeElement.type !== "checkbox" && document.activeElement.type !== "radio";
+
+async function boot() {
+  S.cfg = await (await fetch("/api/config")).json();
+  const data = await (await fetch("/api/items")).json();
+  S.items = data.items; S.saved = data.saved;
+  $("annotator").value = localStorage.getItem("annotator") || S.cfg.annotator;
+  const tasks = ["すべて", ...new Set(S.items.map(i => i.task))];
+  $("taskFilter").replaceChildren(...tasks.map(t => new Option(t, t)));
+  buildCauses(); buildPalette(); rebuildOrder(); show();
+}
+function rebuildOrder() {
+  const task = $("taskFilter").value, pending = $("pendingOnly").checked;
+  S.order = S.items.map((_, k) => k).filter(k => (task === "すべて" || S.items[k].task === task) && !(pending && S.saved[S.items[k].id]));
+  S.pos = 0;
+}
+function buildCauses() {
+  $("causes").replaceChildren(...S.cfg.causes.map(c => { const l = document.createElement("label"); l.className = "row";
+    l.innerHTML = '<input type="checkbox" name="cause" value="' + c.id + '"> <span>' + c.ja + ' <small class="muted">' + c.id + '</small></span>'; return l; }));
+}
+function buildPalette() {
+  const groups = {}; S.cfg.skills.forEach(s => (groups[s.group] = groups[s.group] || []).push(s));
+  $("palette").replaceChildren(...Object.entries(groups).map(([g, skills]) => {
+    const d = document.createElement("div"); d.className = "chips"; d.style.marginBottom = "4px";
+    const label = document.createElement("span"); label.className = "muted"; label.textContent = g; label.style.width = "5.5em"; d.append(label);
+    skills.forEach(s => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.title = s.when + (s.params.length ? "  (" + s.params.join(", ") + ")" : "");
+      b.innerHTML = s.id + ' <small>' + s.ja + '</small>'; b.addEventListener("click", () => { S.plan.push({ skill: s.id, note: "" }); renderPlan(); }); d.append(b); });
+    return d; }));
+}
+function renderPlan() {
+  $("plan").replaceChildren(...S.plan.map((p, k) => { const li = document.createElement("li");
+    const n = document.createElement("span"); n.textContent = (k + 1) + "."; const sk = document.createElement("span"); sk.className = "skill"; sk.textContent = p.skill;
+    const note = document.createElement("input"); note.type = "text"; note.value = p.note; note.placeholder = "パラメータ(例: standoff を 2 cm 手前に)"; note.addEventListener("input", () => p.note = note.value);
+    const up = document.createElement("button"); up.type = "button"; up.textContent = "↑"; up.addEventListener("click", () => { if (k) { [S.plan[k - 1], S.plan[k]] = [S.plan[k], S.plan[k - 1]]; renderPlan(); } });
+    const rm = document.createElement("button"); rm.type = "button"; rm.textContent = "✕"; rm.addEventListener("click", () => { S.plan.splice(k, 1); renderPlan(); });
+    li.append(n, sk, note, up, rm); return li; }));
+}
+function current() { return S.items[S.order[S.pos]]; }
+function show() {
+  const item = current();
+  const done = Object.keys(S.saved).length;
+  $("progress").textContent = "注釈済み " + done + " / " + S.items.length;
+  $("where").textContent = item ? (S.pos + 1) + " / " + S.order.length : "";
+  if (!item) { $("task").textContent = ""; $("goal").textContent = "表示する動画がありません(「未注釈のみ」を外すか、タスクを変えてください)"; vA.removeAttribute("src"); vB.removeAttribute("src"); return; }
+  $("task").textContent = item.task; $("goal").textContent = item.task_text; $("epid").textContent = item.id;
+  vA.src = src(item.videos.above); vB.src = item.videos.rightfront ? src(item.videos.rightfront) : ""; vA.load(); vB.load();
+  $("hint").hidden = true; S.hintSeen = false; $("showHint").textContent = "データセットのラベルと説明を見る(ヒント)";
+  $("hint").innerHTML = "<b>データセットのラベル: " + item.dataset.class + "</b><br>説明: " + (item.dataset.explanation || "—") + "<br>回復の提案: " + (item.dataset.correction || "—");
+  const r = S.saved[item.id] || {};
+  S.plan = (r.plan || []).map(p => ({ ...p })); renderPlan();
+  document.querySelectorAll("input[name=visible]").forEach(x => x.checked = r.visible === x.value);
+  document.querySelectorAll("input[name=conf]").forEach(x => x.checked = String(r.confidence) === x.value);
+  document.querySelectorAll("input[name=cause]").forEach(x => x.checked = (r.causes || []).includes(x.value));
+  $("what").value = r.what_happened || ""; $("avoid").value = r.avoid_repeat || ""; $("missing").value = r.missing_skill || ""; $("notes").value = r.notes || "";
+  S.tFail = r.t_fail ?? null; S.tStart = r.t_start ?? null; S.tEnd = r.t_end ?? null; marks();
+  $("saved").textContent = S.saved[item.id] ? "保存済み(" + (r.saved_at || "") + ")" : "";
+}
+function marks() { $("tFail").textContent = S.tFail == null ? "未記録" : fmt(S.tFail); $("tStart").textContent = fmt(S.tStart); $("tEnd").textContent = fmt(S.tEnd); }
+async function save(goNext) {
+  const item = current(); if (!item) return;
+  const record = { id: item.id, task: item.task, annotator: $("annotator").value, visible: (document.querySelector("input[name=visible]:checked") || {}).value || null,
+    t_fail: S.tFail, t_start: S.tStart, t_end: S.tEnd, what_happened: $("what").value.trim(),
+    causes: [...document.querySelectorAll("input[name=cause]:checked")].map(x => x.value), plan: S.plan.filter(p => p.skill),
+    avoid_repeat: $("avoid").value.trim(), missing_skill: $("missing").value.trim(), confidence: Number((document.querySelector("input[name=conf]:checked") || {}).value) || null,
+    notes: $("notes").value.trim(), hint_seen_before_saving: S.hintSeen };
+  localStorage.setItem("annotator", record.annotator);
+  const res = await fetch("/api/annotate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(record) });
+  if (!res.ok) { $("saved").textContent = "保存できませんでした"; return; }
+  S.saved[item.id] = record; $("saved").textContent = "保存しました";
+  if (goNext) next(true); else show();
+}
+function next(afterSave) {
+  if ($("pendingOnly").checked && afterSave) { const id = current().id; S.order = S.order.filter(k => S.items[k].id !== id || false); if (S.pos >= S.order.length) S.pos = Math.max(0, S.order.length - 1); }
+  else S.pos = Math.min(S.order.length - 1, S.pos + 1);
+  show();
+}
+// playback of the two views together
+function duration() { return vA.duration || 0; }
+function seekTo(t) { t = Math.max(0, Math.min(duration(), t)); vA.currentTime = t; vB.currentTime = t; }
+$("play").addEventListener("click", () => { if (vA.paused) { vA.play(); vB.play(); } else { vA.pause(); vB.pause(); } });
+$("back").addEventListener("click", () => { vA.pause(); vB.pause(); seekTo(vA.currentTime - 1 / FPS); });
+$("fwd").addEventListener("click", () => { vA.pause(); vB.pause(); seekTo(vA.currentTime + 1 / FPS); });
+$("speed").addEventListener("change", () => { vA.playbackRate = vB.playbackRate = Number($("speed").value); });
+$("seek").addEventListener("input", () => seekTo(Number($("seek").value) / 1000 * duration()));
+vA.addEventListener("timeupdate", () => { $("seek").value = duration() ? vA.currentTime / duration() * 1000 : 0; $("time").textContent = vA.currentTime.toFixed(2) + " / " + duration().toFixed(2) + " s";
+  if (!vA.paused && Math.abs(vB.currentTime - vA.currentTime) > 0.15) vB.currentTime = vA.currentTime; });
+vA.addEventListener("ended", () => { if ($("loop").checked) { seekTo(0); vA.play(); vB.play(); } else vB.pause(); });
+vA.addEventListener("loadedmetadata", () => { vA.playbackRate = vB.playbackRate = Number($("speed").value); });
+$("markFail").addEventListener("click", () => { S.tFail = vA.currentTime; marks(); });
+$("markStart").addEventListener("click", () => { S.tStart = vA.currentTime; marks(); });
+$("markEnd").addEventListener("click", () => { S.tEnd = vA.currentTime; marks(); });
+$("showHint").addEventListener("click", () => { $("hint").hidden = !$("hint").hidden; if (!$("hint").hidden) S.hintSeen = true; $("showHint").textContent = $("hint").hidden ? "データセットのラベルと説明を見る(ヒント)" : "ヒントを隠す"; });
+$("save").addEventListener("click", () => save(true)); $("skip").addEventListener("click", () => next(false));
+$("next").addEventListener("click", () => next(false)); $("prev").addEventListener("click", () => { S.pos = Math.max(0, S.pos - 1); show(); });
+$("taskFilter").addEventListener("change", () => { rebuildOrder(); show(); }); $("pendingOnly").addEventListener("change", () => { rebuildOrder(); show(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(true); return; }
+  if (typing()) return;
+  if (e.key === " ") { e.preventDefault(); $("play").click(); } else if (e.key === "ArrowLeft") { e.preventDefault(); $("back").click(); } else if (e.key === "ArrowRight") { e.preventDefault(); $("fwd").click(); }
+});
+boot();
+</script>
+</body>
+</html>

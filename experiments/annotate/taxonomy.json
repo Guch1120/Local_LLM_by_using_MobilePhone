@@ -1,0 +1,17 @@
+{
+  "note": "Causes of a failure, written so that each one points at a different recovery. Edit freely. An annotator can tick several and add free text.",
+  "causes": [
+    {"id": "grasp_miss", "ja": "つかみ損ね(閉じたが物をつかめていない)"},
+    {"id": "grasp_slip", "ja": "つかんだあとに滑った・落とした"},
+    {"id": "approach_offset", "ja": "接近の位置がずれた(物・目標に合っていない)"},
+    {"id": "place_offset", "ja": "置く・差し込む位置がずれた"},
+    {"id": "orientation_offset", "ja": "向きが合っていない"},
+    {"id": "push_miss", "ja": "押す向き・量が違った(足りない、行き過ぎ)"},
+    {"id": "collision_blocked", "ja": "ぶつかった・動けなくなった"},
+    {"id": "object_moved", "ja": "物が動いた・倒れた(ロボットが動かした、または元から)"},
+    {"id": "wrong_target", "ja": "対象や目標を取り違えた"},
+    {"id": "step_skipped", "ja": "手順が抜けた・順序が違う"},
+    {"id": "no_motion", "ja": "動かなかった・時間切れ"},
+    {"id": "unclear", "ja": "動画からは原因が分からない"}
+  ]
+}

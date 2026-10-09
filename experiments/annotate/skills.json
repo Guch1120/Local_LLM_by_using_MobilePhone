@@ -1,0 +1,24 @@
+{
+  "note": "Starter skills for the Piper arm. Edit freely: the annotation tool reads this file, and 'params' are the knobs a recovery may change between attempts.",
+  "skills": [
+    {"id": "DetectObject", "group": "perception", "ja": "対象物を再検出する", "params": ["label"], "when": "対象物の位置が古い、動いた、見失った"},
+    {"id": "CheckGripperHolding", "group": "perception", "ja": "グリッパーが物をつかんでいるか確認する", "params": [], "when": "つかめたかを関節状態(開き)で確かめる"},
+    {"id": "MoveToObservePose", "group": "perception", "ja": "見やすい観測姿勢へ移動する", "params": ["pose_name"], "when": "腕が対象物を隠している、画像で確認したい"},
+    {"id": "MoveToNamedPose", "group": "motion", "ja": "名前付きの姿勢へ移動する(home など)", "params": ["pose_name"], "when": "安全な姿勢に戻す、やり直しの起点"},
+    {"id": "ApproachObject", "group": "motion", "ja": "対象物に近づく(上方または手前まで)", "params": ["object", "standoff_m", "offset_xyz_m", "yaw_deg"], "when": "つかむ前の接近位置を直す"},
+    {"id": "MoveRelative", "group": "motion", "ja": "いまの位置から少し動かす", "params": ["dx_m", "dy_m", "dz_m"], "when": "数 cm の位置補正"},
+    {"id": "Lift", "group": "motion", "ja": "真上に持ち上げる", "params": ["height_m"], "when": "持ち上げて確認する、障害物から離す"},
+    {"id": "Retreat", "group": "motion", "ja": "後退する(接近の向きと逆)", "params": ["distance_m"], "when": "接触・干渉したときに離れる"},
+    {"id": "RotateWrist", "group": "motion", "ja": "手首を回す", "params": ["yaw_deg"], "when": "物の向きに合わせる"},
+    {"id": "VisualServo", "group": "motion", "ja": "画像を見ながら位置を合わせる", "params": ["target", "tolerance_px"], "when": "目標との位置ずれを画像で詰める"},
+    {"id": "OpenGripper", "group": "gripper", "ja": "グリッパーを開く", "params": ["width_m"], "when": "つかみ直し、物を放す"},
+    {"id": "CloseGripper", "group": "gripper", "ja": "グリッパーを閉じる", "params": ["width_m", "force"], "when": "つかむ(力と幅を変えて再試行)"},
+    {"id": "PlaceObject", "group": "task", "ja": "物を置く", "params": ["target", "release_height_m"], "when": "箱や目標の位置へ置く"},
+    {"id": "PushObject", "group": "task", "ja": "物を押す", "params": ["target", "distance_m", "direction"], "when": "目標まで押す"},
+    {"id": "InsertObject", "group": "task", "ja": "物を差し込む", "params": ["target", "depth_m"], "when": "穴や棚に入れる"},
+    {"id": "Wait", "group": "control", "ja": "待つ", "params": ["seconds"], "when": "物が落ち着くのを待つ"},
+    {"id": "RetryFromCheckpoint", "group": "control", "ja": "直前のチェックポイントからやり直す", "params": ["checkpoint"], "when": "手順をやり直す"},
+    {"id": "RequestHuman", "group": "control", "ja": "人に助けを求める", "params": ["reason"], "when": "回復できそうにない、安全でない"},
+    {"id": "Abort", "group": "control", "ja": "中止する", "params": [], "when": "続けると危険、または意味がない"}
+  ]
+}
