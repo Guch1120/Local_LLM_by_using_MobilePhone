@@ -20,6 +20,7 @@ ap.add_argument("--frames", default="even6", choices=["even6", "last3", "even12"
 ap.add_argument("--exclude-tasks", default="", help="comma-separated simulation task families left out of the RoboFAC examples (a held-out-task test)")
 ap.add_argument("--ident-per-class", type=int, default=0, help="error-type examples per class (0: all examples as they are); small classes are drawn again with new option orders")
 ap.add_argument("--ident-choices", type=int, default=0, help="number of options shown in an error-type question (0: as stored); the correct one plus random others, in random order")
+ap.add_argument("--holdout-ident", type=int, default=0, help="set this many error-type videos aside (never trained on) and write them as a test folder robofac_sim_ident_eval")
 ap.add_argument("--task-text", action="store_true")
 ap.add_argument("--only-with-task-text", action="store_true", help="keep only detection examples that have a task description, whether or not the prompt shows it (a fair control)")
 ap.add_argument("--vsr-full-answer", action="store_true", help="old format: the whole JSON answer carries loss (dilutes the informative token)")
@@ -59,6 +60,9 @@ for item in pos + neg:
         prompt = lead + item["question"] + " Answer yes or no."
     out.append(example(item, prompt, "Yes" if item["answer"] == "yes" else "No"))
 ident = [i for i in robofac if i["type"] == "identification"]; rnd.shuffle(ident)
+held_out = []
+if a.holdout_ident:
+    held_out, ident = ident[:a.holdout_ident], ident[a.holdout_ident:]
 ident_idx = PICK[a.ident_frames or a.frames]
 ident_lead = ("This is one frame from a video of a robotic arm. " if len(ident_idx) == 1
               else f"These are {WORDS[len(ident_idx)]} frames in time order from a video of a robotic arm. ")
@@ -100,6 +104,17 @@ if a.vsr:
         else:
             example_vsr["prefix"], example_vsr["answer"] = '{"assessment": "', verdict + '"}'
         out.append(example_vsr)
+if held_out:
+    folder = f"{DATA}/robot/robofac_sim_ident_eval"; os.makedirs(folder, exist_ok=True)
+    if not os.path.exists(f"{folder}/images"): os.symlink("../robofac_train/images", f"{folder}/images")
+    tests = []
+    for item in held_out:
+        question, answer = rebuild(item["question"], item["answer"])
+        tests.append({"id": item["id"], "kind": "mcq", "type": "identification/sim", "answer": answer, "question": ident_lead + question,
+                      "images": [item["frames"][k] for k in ident_idx], "task": item["task"]})
+    json.dump(tests, open(f"{folder}/usable.json", "w"))
+    held_ids = {i["id"] for i in held_out}
+    print(len(tests), "error-type videos held out for the simulation test")
 rnd.shuffle(out)
 json.dump(out, open(a.out, "w"))
 print(len(out), "examples:", dict(collections.Counter((e["source"], e["type"], e["answer"] if e["type"] == "detection" else "-") for e in out)))
