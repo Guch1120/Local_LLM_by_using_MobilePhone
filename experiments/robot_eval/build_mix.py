@@ -10,7 +10,7 @@ usage: build_mix.py OUT.json [--det-pos N] [--det-neg-ratio R] [--ident N] [--vs
 The prompts are the ones eval_robot_hf.py / eval_robofac_variants.py use, so training and test see the same wording.
 Paths are the ones inside the Docker container (~/data/robot -> /robot, ~/data/vsr -> /data/vsr).
 """
-import argparse, json, os, random
+import argparse, collections, json, os, random, re
 
 ap = argparse.ArgumentParser()
 ap.add_argument("out")
@@ -18,6 +18,8 @@ ap.add_argument("--det-pos", type=int, default=10**9); ap.add_argument("--det-ne
 ap.add_argument("--ident", type=int, default=10**9); ap.add_argument("--vsr", type=int, default=0)
 ap.add_argument("--frames", default="even6", choices=["even6", "last3", "even12", "firstlast", "last1", "last2", "last6", "gap4"]); ap.add_argument("--ident-frames", default=None, choices=[None, "even6", "last3", "even12", "firstlast", "last1", "last2", "last6", "gap4"], help="frames for the error-type examples (default: same as --frames)")
 ap.add_argument("--exclude-tasks", default="", help="comma-separated simulation task families left out of the RoboFAC examples (a held-out-task test)")
+ap.add_argument("--ident-per-class", type=int, default=0, help="error-type examples per class (0: all examples as they are); small classes are drawn again with new option orders")
+ap.add_argument("--ident-choices", type=int, default=0, help="number of options shown in an error-type question (0: as stored); the correct one plus random others, in random order")
 ap.add_argument("--task-text", action="store_true")
 ap.add_argument("--only-with-task-text", action="store_true", help="keep only detection examples that have a task description, whether or not the prompt shows it (a fair control)")
 ap.add_argument("--vsr-full-answer", action="store_true", help="old format: the whole JSON answer carries loss (dilutes the informative token)")
@@ -60,8 +62,33 @@ ident = [i for i in robofac if i["type"] == "identification"]; rnd.shuffle(ident
 ident_idx = PICK[a.ident_frames or a.frames]
 ident_lead = ("This is one frame from a video of a robotic arm. " if len(ident_idx) == 1
               else f"These are {WORDS[len(ident_idx)]} frames in time order from a video of a robotic arm. ")
-for item in ident[:a.ident]:
-    out.append(example(item, ident_lead + item["question"], item["answer"], ident_idx))
+
+def parse_choices(question):
+    """(text before 'Choices:', options without their letters and trailing period) of an error-type question."""
+    body, rest = question.split(" Choices: ", 1)
+    rest = rest.split(" Please answer")[0]
+    return body, [o.strip().rstrip(".").strip() for o in re.split(r"\s*[A-H]\.\s+", rest) if o.strip()]
+
+def rebuild(question, answer_letter):
+    """A question with the options in a new random order and, optionally, a random subset (the correct option always stays)."""
+    body, options = parse_choices(question)
+    correct = options[ord(answer_letter) - 65]
+    others = [o for o in options if o != correct]
+    if a.ident_choices: others = rnd.sample(others, min(a.ident_choices - 1, len(others)))
+    shown = [correct] + others; rnd.shuffle(shown)
+    lettered = " ".join(f"{chr(65 + k)}. {o}." for k, o in enumerate(shown))
+    return (f"{body} Choices: {lettered}. Please answer directly with only the letter of the correct option and nothing else.",
+            chr(65 + shown.index(correct)))
+
+chosen = ident[:a.ident]
+if a.ident_per_class:
+    by_class = collections.defaultdict(list)
+    for item in ident:
+        body, options = parse_choices(item["question"]); by_class[options[ord(item["answer"]) - 65]].append(item)
+    chosen = [x for items in by_class.values() for x in rnd.choices(items, k=a.ident_per_class)]
+for item in chosen:
+    question, answer = (rebuild(item["question"], item["answer"]) if (a.ident_choices or a.ident_per_class) else (item["question"], item["answer"]))
+    out.append(example(item, ident_lead + question, answer, ident_idx))
 if a.vsr:
     rows = json.load(open(f"{DATA}/vsr/train/usable.json")); rnd.shuffle(rows)
     for r in rows[:a.vsr]:
@@ -75,5 +102,4 @@ if a.vsr:
         out.append(example_vsr)
 rnd.shuffle(out)
 json.dump(out, open(a.out, "w"))
-import collections
 print(len(out), "examples:", dict(collections.Counter((e["source"], e["type"], e["answer"] if e["type"] == "detection" else "-") for e in out)))
