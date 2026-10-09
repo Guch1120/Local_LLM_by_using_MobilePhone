@@ -3,6 +3,6 @@
 set -euo pipefail
 TAG="$1"; MIX="$2"; shift 2
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; mkdir -p ~/data/robot/results ~/data/vsr/adapters
-docker run --rm --gpus all --user "$(id -u):$(id -g)" -e PYTHONDONTWRITEBYTECODE=1 -e HF_HOME=/tmp/hf -v /etc/passwd:/etc/passwd:ro \
+docker run --rm --gpus all --user "$(id -u):$(id -g)" -e PYTHONDONTWRITEBYTECODE=1 -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True -e HF_HOME=/tmp/hf -v /etc/passwd:/etc/passwd:ro \
   -v ~/models:/models -v ~/data:/data -v ~/data/robot:/robot -v "$HERE":/work vlm-finetune:dev \
   python train_generic.py --examples "/robot/$(basename "$MIX")" --out "/data/vsr/adapters/$TAG" "$@" 2>&1 | grep -v "Loading weights" | tee ~/data/robot/results/train_$TAG.log
