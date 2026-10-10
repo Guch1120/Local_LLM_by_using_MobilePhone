@@ -10,10 +10,11 @@ import argparse, collections, glob, json, os, random, re
 
 ap = argparse.ArgumentParser()
 ap.add_argument("tag"); ap.add_argument("--split", required=True, choices=["leaky", "loto"]); ap.add_argument("--task", default="")
+ap.add_argument("--classes", default="Orientation deviation,Grasping error,Position deviation", help="comma-separated classes to keep (for example the two that every task has)")
 ap.add_argument("--per-class", type=int, default=192); ap.add_argument("--seed", type=int, default=0)
 a = ap.parse_args()
 DATA = os.path.expanduser("~/data/robot"); rnd = random.Random(a.seed)
-CLASSES = ["Orientation deviation", "Grasping error", "Position deviation"]
+CLASSES = [c for c in a.classes.split(",") if c]
 anns = {}
 for path in sorted(glob.glob(f"{DATA}/robofac/test_real_*.json")): anns.update(json.load(open(path)))
 task_text = {i["id"]: i["task_text"] for i in json.load(open(f"{DATA}/robofac_real12/usable.json"))}
@@ -23,6 +24,7 @@ for i in json.load(open(f"{DATA}/robofac_real/usable.json")):
     key = i["id"].rsplit("-", 1)[0]; body = i["question"].split("Choices:")[1].split("Please answer")[0]
     options = [o.strip().rstrip(".").strip() for o in re.split(r"\s*[A-H]\.\s+", body) if o.strip()]
     video = anns[key]["video"]
+    if options[ord(i["answer"]) - 65] not in CLASSES: continue
     items.append({"key": key, "task": i["task"], "class": options[ord(i["answer"]) - 65], "images": i["images"], "text": task_text[key],
                   "episode": (video.split("/")[0], video.split("/")[-1])})
 
