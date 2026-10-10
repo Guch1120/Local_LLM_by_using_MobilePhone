@@ -1,10 +1,12 @@
 """Annotation tool for failure videos: why did the robot fail, and what should it do next?
 
 usage: python3 server.py [--data ~/data/robot] [--port 8765] [--host 127.0.0.1] [--annotator NAME]
+                        [--store FILE] [--manifest FILE --video-root DIR [--no-robofac]]
 
 Serves one page (index.html), the two camera views of each failed RoboFAC episode (with Range requests, so the video can be scrubbed),
 and stores the answers in annotations.jsonl next to this file (one JSON per line; the last line for an episode wins).
-Skills and causes come from skills.json and taxonomy.json. Use --host 0.0.0.0 only on a network you trust: the tool has no login.
+Your own videos: --manifest is a JSON list of {"id", "task", "task_text", "videos": {"wrist": "a_wrist.mp4", "side": "a_side.mp4"}} with the file names
+relative to --video-root (any number of cameras, any names; the first one is the master of the playback). Skills and causes come from skills.json and taxonomy.json. Use --host 0.0.0.0 only on a network you trust: the tool has no login.
 """
 import argparse, collections, glob, json, os, random, re, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -14,10 +16,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ap = argparse.ArgumentParser()
 ap.add_argument("--data", default="~/data/robot"); ap.add_argument("--port", type=int, default=8765)
 ap.add_argument("--host", default="127.0.0.1"); ap.add_argument("--annotator", default=os.environ.get("USER", "annotator"))
+ap.add_argument("--store", default=None, help="annotation file (default: annotations.jsonl next to this script)")
+ap.add_argument("--manifest", default=None); ap.add_argument("--video-root", default=None); ap.add_argument("--no-robofac", action="store_true")
 args = ap.parse_args()
 DATA = os.path.expanduser(args.data)
 VIDEO_ROOT = os.path.realpath(f"{DATA}/robofac_data/realworld_data")
-STORE = os.path.join(HERE, "annotations.jsonl")
+STORE = os.path.expanduser(args.store) if args.store else os.path.join(HERE, "annotations.jsonl")
+CUSTOM_ROOT = os.path.realpath(os.path.expanduser(args.video_root)) if args.video_root else None
 lock = threading.Lock()
 
 def load_items():
@@ -29,12 +34,12 @@ def load_items():
         if "Failure identification" not in entry["annos"]: continue  # successful episodes have no failure to describe
         folder, camera, name = entry["video"].split("/")[0], entry["video"].split("/")[3].replace("observation.images.", ""), entry["video"].split("/")[-1]
         item = episodes.setdefault((folder, name), {"id": f"{folder}/{name[:-4]}", "task": entry["task"], "videos": {}})
-        item["videos"][camera] = entry["video"]
+        item["videos"][camera] = "r/" + entry["video"]
         qa = {c: [m["value"] for m in turns] for c, turns in entry["annos"].items()}
         item["task_text"] = qa["Task identification"][1].strip()
         item["dataset"] = {"class": qa["Failure identification"][1].strip(), "explanation": qa.get("Failure explanation", ["", ""])[1],
                            "correction": qa.get("High-level correction", ["", ""])[1]}
-    items = [i for i in episodes.values() if "above" in i["videos"]]
+    items = [i for i in episodes.values() if "above" in i["videos"]] if not args.no_robofac and os.path.isdir(VIDEO_ROOT) else []
     by_task = collections.defaultdict(list)
     for i in items: by_task[i["task"]].append(i)
     rnd = random.Random(7)
@@ -43,7 +48,12 @@ def load_items():
     while any(by_task.values()):
         for task in sorted(by_task):
             if by_task[task]: ordered.append(by_task[task].pop())
-    return ordered
+    custom = []
+    if args.manifest:
+        for item in json.load(open(os.path.expanduser(args.manifest))):
+            item["videos"] = {cam: "c/" + path for cam, path in item["videos"].items()}
+            item.setdefault("task", "custom"); item.setdefault("task_text", ""); custom.append(item)
+    return custom + ordered
 
 ITEMS = load_items()
 KNOWN = {i["id"] for i in ITEMS}
@@ -83,8 +93,11 @@ class Handler(BaseHTTPRequestHandler):
         with lock, open(STORE, "a") as f: f.write(json.dumps(record, ensure_ascii=False) + "\n")
         self.send_bytes(b'{"ok": true}', "application/json")
     def send_video(self, relative):
-        full = os.path.realpath(os.path.join(VIDEO_ROOT, relative))
-        if not full.startswith(VIDEO_ROOT + os.sep) or not os.path.isfile(full): return self.send_bytes(b"not found", "text/plain", 404)
+        kind, _, relative = relative.partition("/")
+        root = {"r": VIDEO_ROOT, "c": CUSTOM_ROOT}.get(kind)
+        if not root: return self.send_bytes(b"not found", "text/plain", 404)
+        full = os.path.realpath(os.path.join(root, relative))
+        if not full.startswith(root + os.sep) or not os.path.isfile(full): return self.send_bytes(b"not found", "text/plain", 404)
         size = os.path.getsize(full); start, end = 0, size - 1
         match = re.match(r"bytes=(\d*)-(\d*)", self.headers.get("Range", ""))
         if match:

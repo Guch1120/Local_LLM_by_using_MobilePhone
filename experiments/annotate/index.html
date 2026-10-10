@@ -14,7 +14,7 @@ header h1 { font-size:1rem; margin:0; }
 main { max-width:1200px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); }
 @media (max-width: 900px) { main { grid-template-columns:minmax(0,1fr); } }
 .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; min-width:0; }
-.videos { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.videos { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:6px; }
 video { width:100%; background:#000; border-radius:4px; }
 .cam { font:500 11px/1 ui-monospace,monospace; color:var(--muted); margin:2px 0; }
 .controls { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; margin-top:8px; }
@@ -55,10 +55,7 @@ label.row { display:flex; gap:6px; align-items:flex-start; margin:2px 0; }
     <div style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;margin-bottom:8px">
       <span class="task" id="task"></span><b id="goal"></b><span class="muted" id="epid"></span>
     </div>
-    <div class="videos">
-      <div><div class="cam">above</div><video id="vA" muted playsinline preload="auto"></video></div>
-      <div><div class="cam">rightfront</div><video id="vB" muted playsinline preload="auto"></video></div>
-    </div>
+    <div class="videos" id="videos"></div>
     <div class="controls">
       <button id="play" type="button">再生 / 停止 (Space)</button>
       <button id="back" type="button">◀ 1 コマ (←)</button><button id="fwd" type="button">1 コマ ▶ (→)</button>
@@ -108,7 +105,7 @@ label.row { display:flex; gap:6px; align-items:flex-start; margin:2px 0; }
 const $ = id => document.getElementById(id);
 const S = { cfg: null, items: [], saved: {}, order: [], pos: 0, plan: [], hintSeen: false, tFail: null, tStart: null, tEnd: null };
 const FPS = 30;
-const vA = $("vA"), vB = $("vB");
+let vids = [];  // one <video> per camera; the first is the master of the playback
 const src = p => "/video/" + p.split("/").map(encodeURIComponent).join("/");
 const fmt = t => (t == null ? "—" : t.toFixed(2) + " s");
 const typing = () => ["TEXTAREA", "INPUT", "SELECT"].includes(document.activeElement.tagName) && document.activeElement.type !== "range" && document.activeElement.type !== "checkbox" && document.activeElement.type !== "radio";
@@ -154,11 +151,12 @@ function show() {
   const done = Object.keys(S.saved).length;
   $("progress").textContent = "注釈済み " + done + " / " + S.items.length;
   $("where").textContent = item ? (S.pos + 1) + " / " + S.order.length : "";
-  if (!item) { $("task").textContent = ""; $("goal").textContent = "表示する動画がありません(「未注釈のみ」を外すか、タスクを変えてください)"; vA.removeAttribute("src"); vB.removeAttribute("src"); return; }
+  if (!item) { $("task").textContent = ""; $("goal").textContent = "表示する動画がありません(「未注釈のみ」を外すか、タスクを変えてください)"; $("videos").replaceChildren(); vids = []; return; }
   $("task").textContent = item.task; $("goal").textContent = item.task_text; $("epid").textContent = item.id;
-  vA.src = src(item.videos.above); vB.src = item.videos.rightfront ? src(item.videos.rightfront) : ""; vA.load(); vB.load();
+  buildVideos(item);
   $("hint").hidden = true; S.hintSeen = false; $("showHint").textContent = "データセットのラベルと説明を見る(ヒント)";
-  $("hint").innerHTML = "<b>データセットのラベル: " + item.dataset.class + "</b><br>説明: " + (item.dataset.explanation || "—") + "<br>回復の提案: " + (item.dataset.correction || "—");
+  $("showHint").hidden = !item.dataset;
+  if (item.dataset) $("hint").innerHTML = "<b>データセットのラベル: " + item.dataset.class + "</b><br>説明: " + (item.dataset.explanation || "—") + "<br>回復の提案: " + (item.dataset.correction || "—");
   const r = S.saved[item.id] || {};
   S.plan = (r.plan || []).map(p => ({ ...p })); renderPlan();
   document.querySelectorAll("input[name=visible]").forEach(x => x.checked = r.visible === x.value);
@@ -187,21 +185,35 @@ function next(afterSave) {
   else S.pos = Math.min(S.order.length - 1, S.pos + 1);
   show();
 }
-// playback of the two views together
-function duration() { return vA.duration || 0; }
-function seekTo(t) { t = Math.max(0, Math.min(duration(), t)); vA.currentTime = t; vB.currentTime = t; }
-$("play").addEventListener("click", () => { if (vA.paused) { vA.play(); vB.play(); } else { vA.pause(); vB.pause(); } });
-$("back").addEventListener("click", () => { vA.pause(); vB.pause(); seekTo(vA.currentTime - 1 / FPS); });
-$("fwd").addEventListener("click", () => { vA.pause(); vB.pause(); seekTo(vA.currentTime + 1 / FPS); });
-$("speed").addEventListener("change", () => { vA.playbackRate = vB.playbackRate = Number($("speed").value); });
+// playback of all camera views together
+function buildVideos(item) {
+  const box = $("videos"); box.replaceChildren(); vids = [];
+  Object.entries(item.videos).forEach(([cam, path], k) => {
+    const w = document.createElement("div"), label = document.createElement("div"), v = document.createElement("video");
+    label.className = "cam"; label.textContent = cam; v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = src(path);
+    if (k === 0) {
+      v.addEventListener("timeupdate", () => { $("seek").value = duration() ? v.currentTime / duration() * 1000 : 0; $("time").textContent = v.currentTime.toFixed(2) + " / " + duration().toFixed(2) + " s";
+        if (!v.paused) vids.slice(1).forEach(o => { if (Math.abs(o.currentTime - v.currentTime) > 0.15) o.currentTime = v.currentTime; }); });
+      v.addEventListener("ended", () => { if ($("loop").checked) { seekTo(0); playAll(); } else vids.slice(1).forEach(o => o.pause()); });
+      v.addEventListener("loadedmetadata", () => setRate());
+    }
+    w.append(label, v); box.append(w); vids.push(v);
+  });
+}
+const master = () => vids[0];
+const duration = () => (master() && master().duration) || 0;
+const setRate = () => vids.forEach(v => v.playbackRate = Number($("speed").value));
+const playAll = () => vids.forEach(v => v.play());
+const pauseAll = () => vids.forEach(v => v.pause());
+function seekTo(t) { t = Math.max(0, Math.min(duration(), t)); vids.forEach(v => v.currentTime = t); }
+$("play").addEventListener("click", () => { if (!master()) return; if (master().paused) playAll(); else pauseAll(); });
+$("back").addEventListener("click", () => { pauseAll(); seekTo(master().currentTime - 1 / FPS); });
+$("fwd").addEventListener("click", () => { pauseAll(); seekTo(master().currentTime + 1 / FPS); });
+$("speed").addEventListener("change", setRate);
 $("seek").addEventListener("input", () => seekTo(Number($("seek").value) / 1000 * duration()));
-vA.addEventListener("timeupdate", () => { $("seek").value = duration() ? vA.currentTime / duration() * 1000 : 0; $("time").textContent = vA.currentTime.toFixed(2) + " / " + duration().toFixed(2) + " s";
-  if (!vA.paused && Math.abs(vB.currentTime - vA.currentTime) > 0.15) vB.currentTime = vA.currentTime; });
-vA.addEventListener("ended", () => { if ($("loop").checked) { seekTo(0); vA.play(); vB.play(); } else vB.pause(); });
-vA.addEventListener("loadedmetadata", () => { vA.playbackRate = vB.playbackRate = Number($("speed").value); });
-$("markFail").addEventListener("click", () => { S.tFail = vA.currentTime; marks(); });
-$("markStart").addEventListener("click", () => { S.tStart = vA.currentTime; marks(); });
-$("markEnd").addEventListener("click", () => { S.tEnd = vA.currentTime; marks(); });
+$("markFail").addEventListener("click", () => { S.tFail = master().currentTime; marks(); });
+$("markStart").addEventListener("click", () => { S.tStart = master().currentTime; marks(); });
+$("markEnd").addEventListener("click", () => { S.tEnd = master().currentTime; marks(); });
 $("showHint").addEventListener("click", () => { $("hint").hidden = !$("hint").hidden; if (!$("hint").hidden) S.hintSeen = true; $("showHint").textContent = $("hint").hidden ? "データセットのラベルと説明を見る(ヒント)" : "ヒントを隠す"; });
 $("save").addEventListener("click", () => save(true)); $("skip").addEventListener("click", () => next(false));
 $("next").addEventListener("click", () => next(false)); $("prev").addEventListener("click", () => { S.pos = Math.max(0, S.pos - 1); show(); });
