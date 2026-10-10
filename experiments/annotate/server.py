@@ -81,7 +81,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/": return self.send_bytes(open(f"{HERE}/index.html", "rb").read(), "text/html; charset=utf-8")
         if path == "/api/config":
             return self.send_bytes(json_bytes({"annotator": args.annotator, "skills": json.load(open(f"{HERE}/skills.json"))["skills"],
-                                               "causes": json.load(open(f"{HERE}/taxonomy.json"))["causes"]}), "application/json")
+                                               "causes": json.load(open(f"{HERE}/taxonomy.json"))["causes"],
+                                               "facts": json.load(open(f"{HERE}/facts.json"))["facts"]}), "application/json")
         if path == "/api/items": return self.send_bytes(json_bytes({"items": ITEMS, "saved": saved()}), "application/json")
         if path.startswith("/video/"): return self.send_video(path[len("/video/"):])
         self.send_bytes(b"not found", "text/plain", 404)

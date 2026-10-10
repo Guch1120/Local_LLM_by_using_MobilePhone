@@ -80,18 +80,19 @@ label.row { display:flex; gap:6px; align-items:flex-start; margin:2px 0; }
       <label class="row"><input type="radio" name="visible" value="looks_success"> 成功しているように見える</label>
       <label class="row"><input type="radio" name="visible" value="unclear"> 判断できない</label>
     </fieldset>
-    <fieldset><legend>2. 何が起きましたか(短い文)</legend>
+    <fieldset><legend>2. 見えた事実(動画で確認できることだけ。見えなければ「分からない」)</legend><div id="facts"></div></fieldset>
+    <fieldset><legend>3. 何が起きましたか(短い文)</legend>
       <textarea id="what" placeholder="例: グリッパーが閉じる前にアームが動き出し、箱をつかめなかった"></textarea>
     </fieldset>
-    <fieldset><legend>3. 原因の種類(複数選べます)</legend><div id="causes"></div></fieldset>
-    <fieldset><legend>4. どう回復しますか(Skill を順に追加)</legend>
+    <fieldset><legend>4. 原因の種類(任意。複数選べます)</legend><div id="causes"></div></fieldset>
+    <fieldset><legend>5. どう回復しますか(Skill を順に追加)</legend>
       <div id="palette"></div>
       <ol class="plan" id="plan"></ol>
       <label>同じ手順を繰り返すと、また失敗しそうですか。変えること(パラメータ)は?
         <textarea id="avoid" placeholder="例: そのまま再試行だと同じ失敗をする。つかむ位置を 2 cm 手前にして、力を強くする"></textarea></label>
       <label>一覧にないが必要な Skill <input id="missing" style="width:100%" placeholder="例: 物の向きに合わせて手首を回し、つかみ直す Skill"></label>
     </fieldset>
-    <fieldset><legend>5. 確信度とメモ</legend>
+    <fieldset><legend>6. 確信度とメモ</legend>
       <label class="row"><input type="radio" name="conf" value="3"> 高い</label>
       <label class="row"><input type="radio" name="conf" value="2"> 中くらい</label>
       <label class="row"><input type="radio" name="conf" value="1"> 低い(推測)</label>
@@ -117,12 +118,20 @@ async function boot() {
   $("annotator").value = localStorage.getItem("annotator") || S.cfg.annotator;
   const tasks = ["すべて", ...new Set(S.items.map(i => i.task))];
   $("taskFilter").replaceChildren(...tasks.map(t => new Option(t, t)));
-  buildCauses(); buildPalette(); rebuildOrder(); show();
+  buildFacts(); buildCauses(); buildPalette(); rebuildOrder(); show();
 }
 function rebuildOrder() {
   const task = $("taskFilter").value, pending = $("pendingOnly").checked;
   S.order = S.items.map((_, k) => k).filter(k => (task === "すべて" || S.items[k].task === task) && !(pending && S.saved[S.items[k].id]));
   S.pos = 0;
+}
+function buildFacts() {
+  $("facts").replaceChildren(...S.cfg.facts.map(f => { const row = document.createElement("div"); row.style.margin = "4px 0";
+    const q = document.createElement("div"); q.textContent = f.ja; q.style.fontWeight = "500"; row.append(q);
+    const opts = document.createElement("div"); opts.className = "chips";
+    f.options.forEach(([value, ja]) => { const l = document.createElement("label"); l.className = "chip"; l.style.border = "1px solid var(--line)"; l.style.cursor = "pointer";
+      l.innerHTML = '<input type="radio" name="fact_' + f.id + '" value="' + value + '"> ' + ja; opts.append(l); });
+    row.append(opts); return row; }));
 }
 function buildCauses() {
   $("causes").replaceChildren(...S.cfg.causes.map(c => { const l = document.createElement("label"); l.className = "row";
@@ -162,6 +171,7 @@ function show() {
   document.querySelectorAll("input[name=visible]").forEach(x => x.checked = r.visible === x.value);
   document.querySelectorAll("input[name=conf]").forEach(x => x.checked = String(r.confidence) === x.value);
   document.querySelectorAll("input[name=cause]").forEach(x => x.checked = (r.causes || []).includes(x.value));
+  S.cfg.facts.forEach(f => document.querySelectorAll("input[name=fact_" + f.id + "]").forEach(x => x.checked = (r.facts || {})[f.id] === x.value));
   $("what").value = r.what_happened || ""; $("avoid").value = r.avoid_repeat || ""; $("missing").value = r.missing_skill || ""; $("notes").value = r.notes || "";
   S.tFail = r.t_fail ?? null; S.tStart = r.t_start ?? null; S.tEnd = r.t_end ?? null; marks();
   $("saved").textContent = S.saved[item.id] ? "保存済み(" + (r.saved_at || "") + ")" : "";
@@ -169,8 +179,9 @@ function show() {
 function marks() { $("tFail").textContent = S.tFail == null ? "未記録" : fmt(S.tFail); $("tStart").textContent = fmt(S.tStart); $("tEnd").textContent = fmt(S.tEnd); }
 async function save(goNext) {
   const item = current(); if (!item) return;
-  const record = { id: item.id, task: item.task, annotator: $("annotator").value, visible: (document.querySelector("input[name=visible]:checked") || {}).value || null,
+  const record = { id: item.id, task: item.task, task_text: item.task_text, annotator: $("annotator").value, visible: (document.querySelector("input[name=visible]:checked") || {}).value || null,
     t_fail: S.tFail, t_start: S.tStart, t_end: S.tEnd, what_happened: $("what").value.trim(),
+    facts: Object.fromEntries(S.cfg.facts.map(f => [f.id, (document.querySelector("input[name=fact_" + f.id + "]:checked") || {}).value || null])),
     causes: [...document.querySelectorAll("input[name=cause]:checked")].map(x => x.value), plan: S.plan.filter(p => p.skill),
     avoid_repeat: $("avoid").value.trim(), missing_skill: $("missing").value.trim(), confidence: Number((document.querySelector("input[name=conf]:checked") || {}).value) || null,
     notes: $("notes").value.trim(), hint_seen_before_saving: S.hintSeen };

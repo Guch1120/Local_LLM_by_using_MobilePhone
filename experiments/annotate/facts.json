@@ -1,0 +1,16 @@
+{
+  "note": "What can be seen in the video, one question per field. The model will be trained to answer these (names, not letters); the failure type and the recovery are decided from the answers. Edit freely: ids are the field names and the values the model answers with (keep them short, lower-case, English, and different from each other).",
+  "facts": [
+    {"id": "reached_object", "ja": "グリッパーは、対象物まで届きましたか", "options": [["yes", "届いた"], ["no", "届かなかった"], ["not_applicable", "該当なし"], ["unclear", "分からない"]]},
+    {"id": "closed_on_object", "ja": "グリッパーを閉じたとき、物体をはさめていましたか", "options": [["yes", "はさめた"], ["no", "はさめなかった(空振り)"], ["never_closed", "閉じていない"], ["not_applicable", "該当なし"], ["unclear", "分からない"]]},
+    {"id": "object_lifted", "ja": "物体は、机から持ち上がりましたか", "options": [["yes", "持ち上がった"], ["no", "持ち上がらなかった"], ["not_applicable", "該当なし(押す・引く作業など)"], ["unclear", "分からない"]]},
+    {"id": "object_moved", "ja": "物体は、ロボットによって、最初の位置から動きましたか", "options": [["toward_goal", "目標に向かって動いた"], ["away_from_goal", "目標と逆に動いた"], ["not_moved", "動いていない"], ["unclear", "分からない"]]},
+    {"id": "dropped", "ja": "運んでいる途中で、物体を落としましたか", "options": [["yes", "落とした"], ["no", "落としていない"], ["not_applicable", "該当なし"], ["unclear", "分からない"]]},
+    {"id": "final_vs_goal", "ja": "最後に、物体は、目標のどこにありましたか", "options": [["on_goal", "目標の上"], ["near_goal", "目標の近く(物体 1 つ分以内)"], ["far_from_goal", "目標から遠い"], ["not_applicable", "該当なし"], ["unclear", "分からない"]]},
+    {"id": "miss_direction", "ja": "目標からのずれは、どちらの向きですか(最も大きいもの)", "options": [["none", "ずれなし"], ["short", "手前(届かない)"], ["overshoot", "行き過ぎ"], ["left", "左"], ["right", "右"], ["other", "その他"], ["unclear", "分からない"]]},
+    {"id": "final_orientation", "ja": "最後の物体の向きは、必要な向きでしたか", "options": [["as_required", "必要な向き"], ["tilted_or_rotated", "傾いた・回った"], ["not_applicable", "該当なし"], ["unclear", "分からない"]]},
+    {"id": "collision", "ja": "ロボットは、何かにぶつかりましたか", "options": [["yes", "ぶつかった"], ["no", "ぶつかっていない"], ["unclear", "分からない"]]},
+    {"id": "wrong_target", "ja": "対象物や目標を、取り違えましたか", "options": [["yes", "取り違えた"], ["no", "取り違えていない"], ["unclear", "分からない"]]},
+    {"id": "stopped_early", "ja": "途中で、動きが止まりましたか(時間切れを含む)", "options": [["yes", "止まった"], ["no", "止まっていない"], ["unclear", "分からない"]]}
+  ]
+}
