@@ -1,0 +1,299 @@
+{
+  "version": 1,
+  "rules": [
+    "id は一度付けたら変えない・再利用しない。削除はせず status を deprecated にする(学習データ・ログが id を参照するため)。",
+    "question は物体名を {a} {b} で埋めて、Yes/No で答えられる自然文にする。画像だけで判断できることを聞く。",
+    "layer: state=1枚のフレームで決まる / event=複数フレームの時間変化で決まる / self=センサー値で決まる(モデルには聞かず、照合に使う)。",
+    "status: proposed(案。まだ学習に使わない) / active(使用中) / deprecated(使わない。理由を note に書く)。",
+    "sim は、シミュレーションの状態から計算できるか(auto)、人の判断が要るか(human)、不可か(none)。params のしきい値は表の値をそのまま使うので、変えたら version を上げる。"
+  ],
+  "predicates": [
+    {
+      "id": "holding",
+      "layer": "state",
+      "args": [
+        "a"
+      ],
+      "question": "Is the {a} held in the gripper?",
+      "sim": "auto",
+      "definition": "grippers closed on the object: gripper-to-object distance < d_hold and the object moves with the gripper (or lifts together with it)",
+      "params": {
+        "d_hold_m": 0.03
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "touching",
+      "layer": "state",
+      "args": [
+        "a",
+        "b"
+      ],
+      "question": "Is the {a} touching the {b}?",
+      "sim": "auto",
+      "definition": "distance between the surfaces (approximated by the poses and sizes) < d_touch",
+      "params": {
+        "d_touch_m": 0.01
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": "ground truth from contact forces is better if the simulator exposes them"
+    },
+    {
+      "id": "on_top",
+      "layer": "state",
+      "args": [
+        "a",
+        "b"
+      ],
+      "question": "Is the {a} resting on top of the {b}?",
+      "sim": "auto",
+      "definition": "a is above b (z difference ≈ half sizes), horizontal offset < half the size of b",
+      "params": {
+        "dz_tol_m": 0.015,
+        "dxy_tol_m": 0.02
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "inside",
+      "layer": "state",
+      "args": [
+        "a",
+        "b"
+      ],
+      "question": "Is the {a} inside the {b}?",
+      "sim": "auto",
+      "definition": "a's center is within b's bounding box",
+      "params": {},
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "at_goal",
+      "layer": "state",
+      "args": [
+        "a"
+      ],
+      "question": "Is the {a} at its goal position?",
+      "sim": "auto",
+      "definition": "distance between a and the goal position < d_goal",
+      "params": {
+        "d_goal_m": 0.03
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": "the goal comes from the task; for images the viewer needs a visible target"
+    },
+    {
+      "id": "near_goal",
+      "layer": "state",
+      "args": [
+        "a"
+      ],
+      "question": "Is the {a} close to, but not at, its goal position?",
+      "sim": "auto",
+      "definition": "d_goal <= distance < d_near",
+      "params": {
+        "d_near_m": 0.1
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "lifted",
+      "layer": "state",
+      "args": [
+        "a"
+      ],
+      "question": "Is the {a} off the table?",
+      "sim": "auto",
+      "definition": "height of a above its rest height > h_lift",
+      "params": {
+        "h_lift_m": 0.02
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "upright",
+      "layer": "state",
+      "args": [
+        "a"
+      ],
+      "question": "Is the {a} standing upright?",
+      "sim": "auto",
+      "definition": "angle between a's long axis and vertical < a_up",
+      "params": {
+        "a_up_deg": 15
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "tilted",
+      "layer": "state",
+      "args": [
+        "a"
+      ],
+      "question": "Is the {a} tilted or rotated from its goal orientation?",
+      "sim": "auto",
+      "definition": "angle between a's orientation and the goal orientation > a_tilt",
+      "params": {
+        "a_tilt_deg": 20
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": "needs a goal orientation"
+    },
+    {
+      "id": "reached",
+      "layer": "event",
+      "args": [
+        "a"
+      ],
+      "question": "Did the gripper reach the {a} at some point?",
+      "sim": "auto",
+      "definition": "min over time of gripper-to-object distance < d_reach",
+      "params": {
+        "d_reach_m": 0.04
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "grasped",
+      "layer": "event",
+      "args": [
+        "a"
+      ],
+      "question": "Did the gripper close on the {a} and pick it up?",
+      "sim": "auto",
+      "definition": "holding became true and a was lifted at some point",
+      "params": {},
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "moved",
+      "layer": "event",
+      "args": [
+        "a"
+      ],
+      "question": "Did the {a} move during the video?",
+      "sim": "auto",
+      "definition": "displacement between first and last frame > d_move",
+      "params": {
+        "d_move_m": 0.02
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "dropped",
+      "layer": "event",
+      "args": [
+        "a"
+      ],
+      "question": "Did the {a} fall out of the gripper?",
+      "sim": "auto",
+      "definition": "holding was true, then false while a was above the table and moving down",
+      "params": {},
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "overshot",
+      "layer": "event",
+      "args": [
+        "a"
+      ],
+      "question": "Did the {a} end up past the goal?",
+      "sim": "auto",
+      "definition": "signed distance along the intended motion direction exceeds the goal by > d_over",
+      "params": {
+        "d_over_m": 0.03
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": "the intended direction comes from start→goal"
+    },
+    {
+      "id": "fell_short",
+      "layer": "event",
+      "args": [
+        "a"
+      ],
+      "question": "Did the {a} stop before reaching the goal?",
+      "sim": "auto",
+      "definition": "mirror of overshot: ends short of the goal along the intended direction",
+      "params": {
+        "d_short_m": 0.03
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "hit_other",
+      "layer": "event",
+      "args": [],
+      "question": "Did the robot hit or push something other than the target?",
+      "sim": "auto",
+      "definition": "any non-target object moves > d_move while the gripper is within d_touch of it",
+      "params": {
+        "d_move_m": 0.02
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": ""
+    },
+    {
+      "id": "gripper_closed",
+      "layer": "self",
+      "args": [],
+      "question": "",
+      "sim": "auto",
+      "definition": "gripper opening < w_closed (from the joint state)",
+      "params": {
+        "w_closed_m": 0.005
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": "asked of the sensors, not of the model; cross-checks the model's holding/grasped answers"
+    },
+    {
+      "id": "gripper_empty_closed",
+      "layer": "self",
+      "args": [],
+      "question": "",
+      "sim": "auto",
+      "definition": "gripper closed to the full range (nothing between the fingers)",
+      "params": {
+        "w_empty_m": 0.001
+      },
+      "status": "proposed",
+      "since": "2026-10-11",
+      "note": "closed-on-nothing is the clearest sensor sign of a missed grasp"
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-10-11",
+      "version": 1,
+      "change": "first draft: 16 asked predicates (state 9, event 7) and 2 sensor ones"
+    }
+  ]
+}
