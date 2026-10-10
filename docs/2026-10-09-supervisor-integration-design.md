@@ -109,6 +109,16 @@
 - 使うアダプタは、モデルタブで選んだもの (`/capabilities` の `adapter` で確認できる)。
 - 既存の `/v1/chat/completions` (OpenAI 互換) は、そのまま残す。
 
+## 3.5 出力の設計: 記号ではなく名前を答える (決定)
+
+失敗の種類の学習で、**選択肢の記号 (A/B/C) で答えさせる設計は、2 通りに失敗した**ことが分かった (`2026-10-09-robofac-training.md` §6.3、§6.7)。記号と答えの固定の対応を近道として覚える (評価で選択肢が変わると崩れる)、または、選択肢の文を読んで記号に直す二段の対応が必要になり、画像の信号が弱いと、均等な答えに潰れる。**答えの文字列そのもの (クラス名、Skill 名) を答えさせる設計**にしたところ、学習が進んだ。Supervisor の出力 (回復行動の選択を含む) も、この方針にする。
+
+- **答えは名前そのもの**: たとえば、回復の最初の Skill は `open_gripper` のように答える。A/B/C や 1/2/3 は使わない。
+- **対策 B (名前の最初のトークンを重ならないようにする)**: Skill の名前は、動詞から始まる snake_case にして、**各名前の最初のトークンを、すべて違うものにする**。`skills.json` は、この方針で名前を付け直した (`detect_object`、`check_grip`、`observe`、`go_named_pose`、`approach_object`、`shift`、`lift`、`back_off`、`rotate_wrist`、`align_visual`、`open_gripper`、`close_gripper`、`place_object`、`push_object`、`insert_object`、`wait`、`restart_from_checkpoint`、`ask_human`、`abort`)。**Skill を追加・変更したら、`experiments/annotate/check_skill_names.py` で、最初のトークンが重ならないことを確認する** (モデルのトークナイザで確認。いまの 19 個は、すべて異なる)。
+- **対策 A (名前全体の確率で比べる)**: 最終的な判断は、**各候補の名前全体の対数確率 (名前を作る全トークンの対数確率の和)** を比べて決める。画像の処理は一度だけで、候補ごとに短い末尾だけを評価する (候補が 19 個でも小さい)。最初のトークンが重なる名前を追加しても、区別できる。この確率は、State ごとの補正 (§5) の入力としても使える。
+- **パラメータは別の欄**: `{"skill": "approach_object", "params": {"standoff_m": 0.02}}` のように、名前と数値を分ける。数値は、名前の選択の後に、別に答えさせる。
+- 回復の計画 (Skill の列) は、1 手ずつ「次の Skill」を答えさせ、その都度、結果 (画像、前回の行動と結果) を見て、次を決める (受け入れ可能: 仕様の「Receding-horizon Recovery」)。
+
 ## 4. PC 側 (`vlm_supervisor/core/`)
 
 仕様のディレクトリ構成に沿う。
