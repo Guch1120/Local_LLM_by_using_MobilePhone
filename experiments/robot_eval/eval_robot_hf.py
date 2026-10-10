@@ -41,7 +41,9 @@ def run(item, folder):
     images = [Image.open(f"{folder}/images/{n}").convert("RGB") for n in item["images"]]
     content = [{"type": "image", "image": im} for im in images]
     json_mode = item["kind"] == "yesno" and a.format == "json"
-    if item["kind"] == "yesno":
+    if item["kind"] == "classify":
+        text = item["question"]
+    elif item["kind"] == "yesno":
         text = (f"Statement: the answer to this question is yes. Question: {item['question']}" if json_mode
                 else item["question"] + " Answer yes or no.")
     else:
@@ -52,6 +54,9 @@ def run(item, folder):
     inputs = processor(text=prompt, images=images, return_tensors="pt").to("cuda")
     with torch.no_grad():
         lp = torch.log_softmax(model(**inputs).logits[0, -1].float(), -1)
+    if item["kind"] == "classify":
+        scores = {label: lse(lp, sorted({first(label), first(" " + label)})) for label in item["labels"]}
+        return {"choice": max(scores, key=scores.get), "scores": scores}
     if item["kind"] == "yesno":
         pos, neg = ("true", "false") if json_mode else ("yes", "no")
         return {"score": lse(lp, ids[pos]) - lse(lp, ids[neg])}
@@ -89,7 +94,7 @@ def breakdown(rows):
     return result
 
 summary = {"model": a.adapter or a.model, "format": a.format, "seconds": round(time.time() - start)}
-for kind in ("yesno", "mcq"):
+for kind in ("yesno", "mcq", "classify"):
     part = [r for r in results if r["kind"] == kind]
     if part: summary[kind] = breakdown(part)
 json.dump({"summary": summary, "results": results}, open(a.out, "w"))

@@ -18,10 +18,13 @@ ap.add_argument("--epochs", type=float, default=1.0); ap.add_argument("--limit",
 ap.add_argument("--accum", type=int, default=16); ap.add_argument("--lr", type=float, default=1e-4)
 ap.add_argument("--rank", type=int, default=16); ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--init-adapter", help="continue from this adapter instead of a fresh one")
+ap.add_argument("--lora-vision", action="store_true", help="also put LoRA on the image encoder's linear layers (the language model's are always trained)")
+ap.add_argument("--max-soft-tokens", type=int, default=0, help="image token budget per frame (default: the processor's 280)")
 a = ap.parse_args()
 random.seed(a.seed); torch.manual_seed(a.seed)
 
 processor = AutoProcessor.from_pretrained(a.model)
+if a.max_soft_tokens: processor.image_processor.max_soft_tokens = a.max_soft_tokens
 quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16, bnb_4bit_use_double_quant=True)
 model = AutoModelForImageTextToText.from_pretrained(a.model, dtype=torch.bfloat16, device_map="cuda", quantization_config=quant)
 model.gradient_checkpointing_enable()
@@ -31,7 +34,9 @@ if a.init_adapter:
     model = PeftModel.from_pretrained(model, a.init_adapter, is_trainable=True)
 else:
     model = get_peft_model(model, LoraConfig(r=a.rank, lora_alpha=2 * a.rank, lora_dropout=0.05, task_type="CAUSAL_LM",
-            target_modules=r".*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"))
+            target_modules=(r"(?:.*language_model.*\.(?:q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj))|"
+                            r"(?:.*vision_tower.*\.(?:q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)\.linear)") if a.lora_vision
+            else r".*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"))
 model.print_trainable_parameters()
 
 examples = json.load(open(a.examples))[:a.limit]
