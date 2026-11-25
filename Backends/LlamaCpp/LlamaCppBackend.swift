@@ -506,7 +506,8 @@ final class LlamaRuntime: @unchecked Sendable {
                     multimodal,
                     raw.bindMemory(to: UInt8.self).baseAddress,
                     raw.count,
-                    false
+                    false,
+                    mtmd_helper_init_opt_default()
                 )
             }
             if let video = wrapper.video_ctx { mtmd_helper_video_free(video) }
