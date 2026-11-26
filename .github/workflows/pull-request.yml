@@ -37,6 +37,14 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - name: Skip LiteRT-LM Git LFS smudging
         run: git lfs install --skip-smudge
+      # b12088 and newer official XCFrameworks have no Simulator slice: build one (cached per tag).
+      - name: Cache the llama.cpp Simulator XCFramework
+        uses: actions/cache@v4
+        with:
+          path: Packages/LlamaCpp/llama-sim.xcframework
+          key: llama-sim-${{ hashFiles('Packages/LlamaCpp/Package.swift', 'scripts/ci/llama_simulator_slice.sh') }}
+      - name: Use a Simulator build of llama.cpp
+        run: bash scripts/ci/llama_simulator_slice.sh
       - name: Build and run unit tests on iOS Simulator
         run: >-
           xcodebuild -project iPhoneLocalAI.xcodeproj

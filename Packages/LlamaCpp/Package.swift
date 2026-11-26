@@ -2,7 +2,7 @@
 // Pins llama.cpp's official Apple XCFramework, which includes libmtmd for image input.
 // LFM3-VL needs b12088 or newer (older builds print garbage); b12719 also has the Metal fix for LFM3 (llama.cpp #32296).
 // Its XCFramework has only macOS and iOS device slices (b10456 was the last with an iOS Simulator
-// slice), so the Simulator unit tests cannot link it until the CI supplies one.
+// slice), so pull-request.yml builds one with scripts/ci/llama_simulator_slice.sh.
 // To update: change the build tag and checksum (`swift package compute-checksum <zip>`).
 
 import PackageDescription

@@ -208,6 +208,9 @@ final class LlamaRuntime: @unchecked Sendable {
         && UserDefaults.standard.string(forKey: "llamaPromptCache") != "0"
     private let chatTemplate: String?
     private let usesGemma4Template: Bool
+    /// LFM3's GGUF sets add_bos_token to false while its template starts with the BOS token, and the ChatML
+    /// fallback that llama.cpp picks for it does not write one, so the app writes it.
+    private let promptPrefix: String
 
     var supportsVision: Bool { multimodal.map { mtmd_support_vision($0) } ?? false }
     /// Audio needs a projector with an audio encoder (Gemma 4's mmproj has one).
@@ -286,6 +289,7 @@ final class LlamaRuntime: @unchecked Sendable {
         self.contextSize = Int(llama_n_ctx(context))
         self.chatTemplate = llama_model_chat_template(model, nil).map { String(cString: $0) }
         self.usesGemma4Template = Self.metadata(model, "general.architecture") == "gemma4"
+        self.promptPrefix = Self.metadata(model, "general.architecture") == "lfm3" ? "<|startoftext|>" : ""
     }
 
     private static func metadata(_ model: OpaquePointer, _ key: String) -> String? {
@@ -300,9 +304,10 @@ final class LlamaRuntime: @unchecked Sendable {
         if usesGemma4Template {
             return GemmaPromptFormatter.format(messages, mediaMarker: mediaMarker, enableThinking: enableThinking)
         }
-        return TemplatePromptFormatter.format(
+        let formatted = TemplatePromptFormatter.format(
             messages, template: chatTemplate, mediaMarker: mediaMarker, enableThinking: enableThinking
         )
+        return (promptPrefix + formatted.prompt, formatted.media)
     }
 
     deinit {
