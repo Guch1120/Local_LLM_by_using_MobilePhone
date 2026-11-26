@@ -7,9 +7,15 @@ The API key is read from ~/.config/iphone-local-ai/api-key; the phone must be fo
 """
 import argparse, base64, json, math, os, time, urllib.request
 
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ja_prompts import to_japanese
+
+untranslated = []
 ap = argparse.ArgumentParser()
 ap.add_argument("model"); ap.add_argument("out"); ap.add_argument("--data", required=True)
 ap.add_argument("--limit", type=int, default=10**9)
+ap.add_argument("--lang", default="en", choices=["en", "ja"], help="ja: translate the templated RoboSpatial questions")
 ap.add_argument("--types", default="", help="comma-separated type prefixes to keep, e.g. detection or identification,locating")
 a = ap.parse_args()
 KEY = open(os.path.expanduser("~/.config/iphone-local-ai/api-key")).read().strip()
@@ -43,6 +49,9 @@ def ask(item):
         data = base64.b64encode(open(f"{a.data}/images/{name}", "rb").read()).decode()
         content.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + data}})
     text = item["question"] + (" Answer yes or no." if item["kind"] == "yesno" else "")
+    if a.lang == "ja" and item["kind"] == "yesno":
+        text, translated = to_japanese(item["question"])
+        untranslated.append(not translated)
     content.append({"type": "text", "text": text})
     return call({"model": a.model, "temperature": 0, "max_tokens": 2, "logprobs": True, "top_logprobs": 10,
                  "chat_template_kwargs": {"enable_thinking": False},
@@ -89,7 +98,7 @@ def correct(r):
 
 
 n = len(results)
-summary = {"model": a.model, "data": os.path.basename(a.data.rstrip("/")), "n": n, "missing": missing,
+summary = {"lang": a.lang, "untranslated": sum(untranslated), "model": a.model, "data": os.path.basename(a.data.rstrip("/")), "n": n, "missing": missing,
            "accuracy": round(sum(map(correct, results)) / max(1, n), 3), "seconds_per_q": round(sum(seconds) / max(1, len(seconds)), 2),
            "median_seconds_per_q": round(sorted(seconds)[len(seconds) // 2], 2) if seconds else None}
 if results and results[0]["kind"] == "yesno":
