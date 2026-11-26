@@ -264,7 +264,11 @@ final class LlamaRuntime: @unchecked Sendable {
             if let value = UserDefaults.standard.string(forKey: "llamaImageMinTokens").flatMap({ Int32($0) }) {
                 mtmdParams.image_min_tokens = value
             }
-            if let value = UserDefaults.standard.string(forKey: "llamaImageMaxTokens").flatMap({ Int32($0) }) {
+            // LFM3-VL's projector has no practical limit (16.7 M pixels), so a 960x1280 photo costs 1,221 tokens.
+            // Capping it at 280 was as accurate on VSR, RoboSpatial and ERQA at a quarter of the time
+            // (docs/2026-11-26-lfm3-vl-evaluation.md), so that is the default; a launch argument wins.
+            let architectureCap: Int32? = Self.metadata(model, "general.architecture") == "lfm3" ? 280 : nil
+            if let value = UserDefaults.standard.string(forKey: "llamaImageMaxTokens").flatMap({ Int32($0) }) ?? architectureCap {
                 mtmdParams.image_max_tokens = value
             }
             guard let created = mtmd_init_from_file(projectorPath, model, mtmdParams) else {
